@@ -51,6 +51,10 @@ class Agent():
         self.shutdown()
 
         # destroy zmq sockets
+        for k, v in self.zmq_sockets.items():
+            self.log.info(f"closing socket {k} ...")
+            v.close()
+
         self.zmq_context.term()
     
     ########################################################################################

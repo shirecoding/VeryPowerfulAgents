@@ -17,3 +17,9 @@ def test_basic():
 
     simple_agent_one.bind_socket(zmq.PUB, {}, "tcp://0.0.0.0:5000")
     simple_agent_one.connect_socket(zmq.SUB, {}, "tcp://0.0.0.0:5000")
+
+    simple_agent_one.bind_socket(zmq.REP, {}, "tcp://0.0.0.0:5001")
+    simple_agent_one.connect_socket(zmq.REQ, {}, "tcp://0.0.0.0:5001")
+
+    simple_agent_one.bind_socket(zmq.ROUTER, {}, "tcp://0.0.0.0:5002")
+    simple_agent_one.connect_socket(zmq.DEALER, {}, "tcp://0.0.0.0:5002")
