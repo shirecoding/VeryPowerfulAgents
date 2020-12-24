@@ -12,12 +12,13 @@ log = stdout_logger(__name__, level=logging.DEBUG)
 
 class Agent():
     
-    def __init__(self, name=uuid.uuid4().hex):
+    def __init__(self, name=None):
 
         self.log = Logger(log, {'agent': name})
-        self.name = name
+        self.name = name if name is not None else uuid.uuid4().hex
         self.initialized_event = threading.Event()
         self.exit_event = threading.Event()
+        self.zmq_sockets = {}
         
         # signals for graceful shutdown
         signal(SIGTERM, self._shutdown)
@@ -29,9 +30,8 @@ class Agent():
 
     def boot(self):
         start = time.time()
-        self.log.info(self.name)
         self.log.info('booting up ...')
-        self.context = zmq.Context()
+        self.zmq_context = zmq.Context()
 
         # user setup
         self.log.info('running user setup ...')
@@ -49,11 +49,35 @@ class Agent():
 
         self.log.info('running user shutdown ...')
         self.shutdown()
+
+        # destroy zmq sockets
+        self.zmq_context.term()
     
     ########################################################################################
-    ## helpers
+    ## networking
     ########################################################################################
 
+    def bind_socket(self, socket_type, options, address):
+        self.log.info(f"binding {socket_type} socket on {address} ...")
+        socket = self.zmq_context.socket(socket_type)
+        for k, v in options.items():
+            if type(v) == str:
+                socket.setsockopt_string(k, v)
+            else:
+                socket.setsockopt(k, v)
+        socket.bind(address)
+        self.zmq_sockets[f"{socket_type}:{address}"] = socket
+
+    def connect_socket(self, socket_type, options, address):
+        self.log.info(f"connecting {socket_type} socket to {address} ...")
+        socket = self.zmq_context.socket(socket_type)
+        for k, v in options.items():
+            if type(v) == str:
+                socket.setsockopt_string(k, v)
+            else:
+                socket.setsockopt(k, v)
+        socket.connect(address)
+        self.zmq_sockets[f"{socket_type}:{address}"] = socket
 
     ########################################################################################
     ## override

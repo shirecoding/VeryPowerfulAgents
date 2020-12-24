@@ -1,3 +1,4 @@
+import zmq
 from agents import Agent
 
 class SimpleAgent(Agent):
@@ -10,7 +11,9 @@ class SimpleAgent(Agent):
 
 def test_basic():
 
-    # test unique name
+    # test connect/bind
     simple_agent_one = SimpleAgent()
     simple_agent_two = SimpleAgent()
-    assert simple_agent_one.name != simple_agent_two.name
+
+    simple_agent_one.bind_socket(zmq.PUB, {}, "tcp://0.0.0.0:5000")
+    simple_agent_one.connect_socket(zmq.SUB, {}, "tcp://0.0.0.0:5000")
