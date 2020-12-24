@@ -16,7 +16,8 @@ class Agent():
 
         self.log = Logger(log, {'agent': name})
         self.name = name
-        self.isinitialized = threading.Event()
+        self.initialized_event = threading.Event()
+        self.exit_event = threading.Event()
         
         # signals for graceful shutdown
         signal(SIGTERM, self._shutdown)
@@ -24,11 +25,11 @@ class Agent():
 
         # boot in thread
         threading.Thread(target=self.boot).start()
-        self.isinitialized.wait()
+        self.initialized_event.wait()
 
     def boot(self):
         start = time.time()
-        
+        self.log.info(self.name)
         self.log.info('booting up ...')
         self.context = zmq.Context()
 
@@ -36,13 +37,15 @@ class Agent():
         self.log.info('running user setup ...')
         self.setup()
 
-        self.isinitialized.set()
+        self.initialized_event.set()
         self.log.info(f'booted in {time.time() - start} seconds ...')
 
     def _shutdown(self, signum, frame):
+        self.log.info('set exit event ...')
+        self.exit_event.set()
 
         self.log.info('wait for initialization before cleaning up ...')
-        self.isinitialized.wait()
+        self.initialized_event.wait()
 
         self.log.info('running user shutdown ...')
         self.shutdown()

@@ -18,4 +18,7 @@ def stdout_logger(name, level=logging.DEBUG):
 class Logger(logging.LoggerAdapter):
 
     def process(self, msg, kwargs):
-        return '[{}] {}'.format(' '.join([ '{}={}'.format(k, v) for k, v in kwargs.items() ]), msg), kwargs
+        return '[{}] {}'.format(
+            ' '.join([ '{}={}'.format(k, v) for k, v in { **kwargs, **self.extra}.items() ]),
+            msg
+        ), kwargs
