@@ -22,10 +22,12 @@ class Client(Agent):
         self.request_socket['observable'].subscribe(lambda x: self.log.info(f"received: {x}"))
 
         # start sending
-        threading.Thread(target=self.send).start()
+        t = threading.Thread(target=self.send)
+        self.threads.append(t) # add to managed threads for graceful cleanup
+        t.start()
 
     def send(self):
-        while not self.exit_event.is_set():
+        while not self.exit_event.is_set(): # use exit event to gracefully exit loop
             time.sleep(1)
             self.counter += 1
             multipart_message = [str(self.counter).encode()]
