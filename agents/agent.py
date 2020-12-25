@@ -16,9 +16,8 @@ log = stdout_logger(__name__, level=logging.DEBUG)
 class Agent():
     
     def __init__(self, name=None):
-
-        self.log = Logger(log, {'agent': name})
         self.name = name if name is not None else uuid.uuid4().hex
+        self.log = Logger(log, {'agent': self.name})
         self.initialized_event = threading.Event()
         self.exit_event = threading.Event()
         self.zmq_sockets = {}
