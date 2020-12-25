@@ -8,8 +8,8 @@ setup(
     author='shirecoding',
     author_email="shirecoding@gmail.com",
     install_requires=[
-        'rxpipes',
-        'zmq'
+        'zmq',
+        'rx'
     ],
     url='https://github.com/shirecoding/VeryPowerfulAgents.git',
     download_url=f'https://github.com/shirecoding/VeryPowerfulAgents/archive/{__version__}.tar.gz',
