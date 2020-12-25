@@ -4,9 +4,9 @@ import threading
 from agents import Agent
 
 class EchoServer(Agent):
-    
-    def setup(self):
-        self.reply_socket = self.bind_socket(zmq.REP, {}, "tcp://0.0.0.0:5000")
+
+    def setup(self, name=None, address=None):
+        self.reply_socket = self.bind_socket(zmq.REP, {}, address)
         self.reply_socket['observable'].subscribe(self.echo)
 
     def echo(self, xs):
@@ -14,8 +14,8 @@ class EchoServer(Agent):
 
 class Client(Agent):
     
-    def setup(self):
-        self.request_socket = self.connect_socket(zmq.REQ, {}, "tcp://0.0.0.0:5000")
+    def setup(self, name=None, address=None):
+        self.request_socket = self.connect_socket(zmq.REQ, {}, address)
         self.counter = 0
 
         # receive
@@ -36,5 +36,5 @@ class Client(Agent):
 
 
 if __name__ == '__main__':
-    echo_server = EchoServer(name='server')
-    client = Client(name='client')
+    echo_server = EchoServer(name='server', address='tcp://0.0.0.0:5000')
+    client = Client(name='client', address='tcp://0.0.0.0:5000')

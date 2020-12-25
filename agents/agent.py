@@ -1,6 +1,8 @@
+import os
 import sys
 import zmq
 import threading
+import traceback
 import time
 import asyncio
 import uuid
@@ -15,8 +17,11 @@ log = stdout_logger(__name__, level=logging.DEBUG)
 
 class Agent():
     
-    def __init__(self, name=None):
-        self.name = name if name is not None else uuid.uuid4().hex
+    def __init__(self, *args, **kwargs):
+        
+        # extract special kwargs
+        self.name = kwargs['name'] if 'name' in kwargs else uuid.uuid4().hex
+
         self.log = Logger(log, {'agent': self.name})
         self.initialized_event = threading.Event()
         self.exit_event = threading.Event()
@@ -29,27 +34,33 @@ class Agent():
         signal(SIGINT, self._shutdown)
 
         # boot in thread
-        t = threading.Thread(target=self.boot)
+        t = threading.Thread(target=self.boot, args=args, kwargs=kwargs)
         self.threads.append(t)
         t.start()
         self.initialized_event.wait()
 
-    def boot(self):
-        start = time.time()
-        self.log.info('booting up ...')
-        self.zmq_context = zmq.Context()
+    def boot(self, *args, **kwargs):
+        try:
+            start = time.time()
+            self.log.info('booting up ...')
+            self.zmq_context = zmq.Context()
 
-        # user setup
-        self.log.info('running user setup ...')
-        self.setup()
+            # user setup
+            self.log.info('running user setup ...')
+            self.setup(*args, **kwargs)
 
-        # process sockets
-        t = threading.Thread(target=self.process_sockets)
-        self.threads.append(t)
-        t.start()
+            # process sockets
+            t = threading.Thread(target=self.process_sockets)
+            self.threads.append(t)
+            t.start()
 
-        self.initialized_event.set()
-        self.log.info(f'booted in {time.time() - start} seconds ...')
+            self.initialized_event.set()
+            self.log.info(f'booted in {time.time() - start} seconds ...')
+        
+        except Exception as e:
+            self.log.error(f"failed to boot ...\n\n{traceback.format_exc()}")
+            self.initialized_event.set()
+            os.kill(os.getpid(), SIGINT)
 
     def _shutdown(self, signum, frame):
         self.log.info('set exit event ...')
@@ -125,6 +136,7 @@ class Agent():
         
         # wait for initialization
         self.initialized_event.wait()
+        self.log.info("start processing sockets ...")
 
         while not self.exit_event.is_set():
             sockets = dict(self.zmq_poller.poll(50))
