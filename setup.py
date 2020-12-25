@@ -9,7 +9,8 @@ setup(
     author_email="shirecoding@gmail.com",
     install_requires=[
         'zmq',
-        'rx'
+        'rx',
+        'pyrsistent'
     ],
     url='https://github.com/shirecoding/VeryPowerfulAgents.git',
     download_url=f'https://github.com/shirecoding/VeryPowerfulAgents/archive/{__version__}.tar.gz',

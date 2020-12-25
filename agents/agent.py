@@ -1,17 +1,20 @@
+import asyncio
+import logging
 import os
 import sys
-import zmq
 import threading
-import traceback
 import time
-import asyncio
+import traceback
 import uuid
+import zmq
+
+from .utils import Logger
+from .utils import stdout_logger
+from pyrsistent import pmap
 from rx.subject import Subject
-from signal import signal
 from signal import SIGINT
 from signal import SIGTERM
-import logging
-from .utils import Logger, stdout_logger
+from signal import signal
 
 log = stdout_logger(__name__, level=logging.DEBUG)
 
@@ -101,13 +104,13 @@ class Agent():
         socket.bind(address)
         observable = Subject()
         socket_name = f"{socket_type}:{address}"
-        self.zmq_sockets[socket_name] = {
+        self.zmq_sockets[socket_name] = pmap({
             'socket': socket,
             'address': address,
             'type': socket_type,
             'options': options,
             'observable': observable
-        }
+        })
         self.zmq_poller.register(socket, zmq.POLLIN)
         return self.zmq_sockets[socket_name]
 
@@ -122,13 +125,13 @@ class Agent():
         socket.connect(address)
         observable = Subject()
         socket_name = f"{socket_type}:{address}"
-        self.zmq_sockets[socket_name] = {
+        self.zmq_sockets[socket_name] = pmap({
             'socket': socket,
             'address': address,
             'type': socket_type,
             'options': options,
             'observable': observable
-        }
+        })
         self.zmq_poller.register(socket, zmq.POLLIN)
         return self.zmq_sockets[socket_name]
 
