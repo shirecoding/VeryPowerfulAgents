@@ -9,6 +9,16 @@ Agents are lightweight microservices with built-in interprocess communications i
 - ZeroMQ communications is done in a thread safe manner using queues (ZeroMQ is not threadsafe)
 - Socket data is received through Observables using RxPy
 
+```bash
+# install from git
+git clone https://github.com/shirecoding/VeryPowerfulAgents.git
+cd VeryPowerfulAgents
+pip3 install ./
+
+# install from pypi
+pip install powerful-agents
+```
+
 # Examples
 
 ## Simple Echo Server & Client

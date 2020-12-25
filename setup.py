@@ -3,7 +3,7 @@ from setuptools import find_packages
 from agents import __version__
 
 setup(
-    name='agents',
+    name='powerful-agents',
     version=__version__,
     author='shirecoding',
     author_email="shirecoding@gmail.com",
