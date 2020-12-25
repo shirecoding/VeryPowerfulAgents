@@ -6,11 +6,11 @@ from agents import Agent
 class EchoServer(Agent):
 
     def setup(self, name=None, address=None):
-        self.reply_socket = self.bind_socket(zmq.REP, {}, address)
-        self.reply_socket.observable.subscribe(self.echo)
+        self.connection = self.bind_socket(zmq.REP, {}, address)
+        self.connection.observable.subscribe(self.echo)
 
     def echo(self, xs):
-        self.reply_socket.socket.send_multipart(xs)
+        self.connection.send(xs)
 
 class Client(Agent):
     
@@ -33,7 +33,7 @@ class Client(Agent):
             self.counter += 1
             multipart_message = [str(self.counter).encode()]
             self.log.info(f"sending: {multipart_message}")
-            self.connection.socket.send_multipart(multipart_message)
+            self.connection.send(multipart_message)
 
 if __name__ == '__main__':
     echo_server = EchoServer(name='server', address='tcp://0.0.0.0:5000')

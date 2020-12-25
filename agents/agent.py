@@ -4,6 +4,7 @@ import os
 import sys
 import threading
 import time
+import queue
 import traceback
 import uuid
 import zmq
@@ -104,12 +105,15 @@ class Agent():
         socket.bind(address)
         observable = Subject()
         socket_name = f"{socket_type}:{address}"
+        send_queue = queue.Queue()
         self.zmq_sockets[socket_name] = pmap({
             'socket': socket,
             'address': address,
             'type': socket_type,
             'options': options,
-            'observable': observable
+            'observable': observable,
+            'send_queue': send_queue,
+            'send': lambda x: send_queue.put(x)
         })
         self.zmq_poller.register(socket, zmq.POLLIN)
         return self.zmq_sockets[socket_name]
@@ -125,12 +129,15 @@ class Agent():
         socket.connect(address)
         observable = Subject()
         socket_name = f"{socket_type}:{address}"
+        send_queue = queue.Queue()
         self.zmq_sockets[socket_name] = pmap({
             'socket': socket,
             'address': address,
             'type': socket_type,
             'options': options,
-            'observable': observable
+            'observable': observable,
+            'send_queue': send_queue,
+            'send': lambda x: send_queue.put(x)
         })
         self.zmq_poller.register(socket, zmq.POLLIN)
         return self.zmq_sockets[socket_name]
@@ -144,8 +151,15 @@ class Agent():
         while not self.exit_event.is_set():
             sockets = dict(self.zmq_poller.poll(50))
             for k, v in self.zmq_sockets.items():
-                if v['socket'] in sockets and sockets[v['socket']] == zmq.POLLIN:
-                    v['observable'].on_next(v['socket'].recv_multipart())
+                # receive socket into observable
+                if v.socket in sockets and sockets[v.socket] == zmq.POLLIN:
+                    v.observable.on_next(v.socket.recv_multipart())
+                # send queue to socket (zmq is not thread safe)
+                while not v.send_queue.empty() and not self.exit_event.is_set():
+                    try:
+                        v.socket.send_multipart(v.send_queue.get(block=False))
+                    except queue.Empty:
+                        pass
 
     ########################################################################################
     ## override
