@@ -62,6 +62,7 @@ class Agent():
         self.shutdown()
 
         # join threads
+        self.log.info('joining threads ...')
         for t in self.threads:
             t.join()
 
