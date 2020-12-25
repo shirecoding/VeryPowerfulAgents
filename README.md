@@ -1,5 +1,13 @@
 # VeryPowerfulAgents
-Very Powerful Agents
+
+Agents are lightweight microservices with built-in interprocess communications infrastructure using ZeroMQ.
+
+## Features
+
+- Graceful boot & shutdown with resource cleanup done correctly
+- User setup/shutdown override methods for graceful boot & shutdown
+- ZeroMQ communications is done in a thread safe manner using queues (ZeroMQ is not threadsafe)
+- Socket data is received through Observables using RxPy
 
 # Examples
 
