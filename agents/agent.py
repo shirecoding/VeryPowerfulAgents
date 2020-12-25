@@ -22,13 +22,16 @@ class Agent():
         self.exit_event = threading.Event()
         self.zmq_sockets = {}
         self.zmq_poller = zmq.Poller()
+        self.threads = []
         
         # signals for graceful shutdown
         signal(SIGTERM, self._shutdown)
         signal(SIGINT, self._shutdown)
 
         # boot in thread
-        threading.Thread(target=self.boot).start()
+        t = threading.Thread(target=self.boot)
+        self.threads.append(t)
+        t.start()
         self.initialized_event.wait()
 
     def boot(self):
@@ -41,7 +44,9 @@ class Agent():
         self.setup()
 
         # process sockets
-        threading.Thread(target=self.process_sockets).start()
+        t = threading.Thread(target=self.process_sockets)
+        self.threads.append(t)
+        t.start()
 
         self.initialized_event.set()
         self.log.info(f'booted in {time.time() - start} seconds ...')
@@ -56,13 +61,18 @@ class Agent():
         self.log.info('running user shutdown ...')
         self.shutdown()
 
+        # join threads
+        for t in self.threads:
+            t.join()
+
         # destroy zmq sockets
         for k, v in self.zmq_sockets.items():
             self.log.info(f"closing socket {k} ...")
             v['socket'].close()
+            v['observable'].dispose()
         self.zmq_context.term()
 
-        sys.exit()
+        sys.exit(0)
     
     ########################################################################################
     ## networking
