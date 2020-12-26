@@ -4,10 +4,26 @@ Agents are lightweight microservices with built-in interprocess communications i
 
 ## Features
 
+#### Agents
+
 - Graceful boot & shutdown with resource cleanup done correctly
 - User setup/shutdown override methods for graceful boot & shutdown
 - ZeroMQ communications is done in a thread safe manner using queues (ZeroMQ is not threadsafe)
 - Socket data is received through Observables using RxPy
+
+#### Powerful Agents
+
+- End-to-end elliptical curve encryption (TODO)
+- Production ready communication architectures, lazy pirate, pub-sub brokers, etc... (TODO)
+- Mesh networks (TODO)
+- ... (TODO)
+
+#### Very Powerful Agents
+
+- REST server routes (TODO)
+- RPC endpoints (TODO)
+- File sharing (TODO)
+- ... (TODO)
 
 ```bash
 # install from git
