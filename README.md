@@ -14,7 +14,8 @@ Agents are lightweight microservices with built-in interprocess communications i
 
 #### Powerful Agents
 
-- Pub/sub notification broker/client
+- Pub/sub notification facilities
+- Rotuer/client facilities
 - End-to-end elliptical curve encryption (TODO)
 - Production ready communication architectures, lazy pirate, etc... (TODO)
 - Mesh networks (TODO)
