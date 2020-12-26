@@ -181,3 +181,77 @@ INFO     [agent=listener] received: [b'4']
 INFO     [agent=sender] publishing: [b'5']
 INFO     [agent=listener] received: [b'5']
 ```
+
+## Router Client
+
+```python
+import zmq
+import time
+import threading
+from agents import PowerfulAgent
+
+class Router(PowerfulAgent):
+
+    def setup(self, name=None, address=None):
+        self.create_router(address)
+
+class Client1(PowerfulAgent):
+    
+    def setup(self, name=None, address=None):
+        self.counter = 0
+        self.client = self.create_client(address)
+
+        # begin sending forever, add to managed threads for graceful cleanup
+        t = threading.Thread(target=self.send_forever)
+        self.threads.append(t)
+        t.start()
+
+    def send_forever(self):
+        # use exit event to gracefully exit loop and graceful cleanup
+        while not self.exit_event.is_set(): 
+            time.sleep(1)
+            self.counter += 1
+            target = 'client2'.encode('utf-8')
+            multipart_message = [ target, str(self.counter).encode() ]
+            self.log.info(f"send to {target}: {multipart_message}")
+            self.client.send(multipart_message)
+
+class Client2(PowerfulAgent):
+    
+    def setup(self, name=None, address=None):
+        self.client = self.create_client(address)
+        self.client.observable.subscribe(lambda x: self.log.info(f"received: {x}"))
+
+if __name__ == '__main__':
+    router = Router(name='router', address='tcp://0.0.0.0:5000')
+    client1 = Client1(name='client1', address='tcp://0.0.0.0:5000')
+    client2 = Client2(name='client2', address='tcp://0.0.0.0:5000')
+```
+
+```bash
+INFO     [agent=router] booting up ...
+INFO     [agent=router] running user setup ...
+INFO     [agent=router] binding 6 socket on tcp://0.0.0.0:5000 ...
+INFO     [agent=router] booted in 0.0016148090362548828 seconds ...
+INFO     [agent=router] start processing sockets ...
+INFO     [agent=client1] booting up ...
+INFO     [agent=client1] running user setup ...
+INFO     [agent=client1] connecting 5 socket to tcp://0.0.0.0:5000 ...
+INFO     [agent=client1] booted in 0.0007421970367431641 seconds ...
+INFO     [agent=client1] start processing sockets ...
+INFO     [agent=client2] booting up ...
+INFO     [agent=client2] running user setup ...
+INFO     [agent=client2] connecting 5 socket to tcp://0.0.0.0:5000 ...
+INFO     [agent=client2] booted in 0.0007507801055908203 seconds ...
+INFO     [agent=client2] start processing sockets ...
+INFO     [agent=client1] send to b'client2': [b'client2', b'1']
+INFO     [agent=client2] received: [b'client1', b'1']
+INFO     [agent=client1] send to b'client2': [b'client2', b'2']
+INFO     [agent=client2] received: [b'client1', b'2']
+INFO     [agent=client1] send to b'client2': [b'client2', b'3']
+INFO     [agent=client2] received: [b'client1', b'3']
+INFO     [agent=client1] send to b'client2': [b'client2', b'4']
+INFO     [agent=client2] received: [b'client1', b'4']
+INFO     [agent=client1] send to b'client2': [b'client2', b'5']
+INFO     [agent=client2] received: [b'client1', b'5']
+```
