@@ -256,7 +256,9 @@ INFO     [agent=client1] send to client2: 5
 INFO     [agent=client2] received: 5
 ```
 
-## Elliptical Curve Authentication/Encryption
+## Elliptical Curve Encryption
+
+This example allows any client with the server's public key to connect and communicate over a secure channel
 
 ```python
 import zmq
