@@ -1,5 +1,39 @@
 import sys
 import logging
+import collections
+import json
+
+class Message():
+
+    ##############################################################################
+    ## message interface
+    ##############################################################################
+    
+    NOTIFICATION = 0
+
+    @classmethod
+    def notification(cls, topic='', payload=''):
+        return [
+            topic.encode(),
+            bytes([cls.NOTIFICATION]),
+            json.dumps({ 'topic': topic, 'payload': payload }).encode()
+        ]
+
+    ##############################################################################
+    ## helper methods
+    ##############################################################################
+
+    @classmethod
+    def decode(cls, multipart):
+        """
+        Parse zmq multipart buffer into message
+        """
+        _, t, payload = multipart
+        t = int.from_bytes(t, byteorder='big')
+        if t == cls.NOTIFICATION:
+            return json.loads(payload.decode())
+        else:
+            return multipart
 
 # logging
 def stdout_logger(name, level=logging.DEBUG):

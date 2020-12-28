@@ -1,5 +1,6 @@
 import zmq
 from .agent import Agent
+from .utils import Message
 
 class PowerfulAgent(Agent):
 

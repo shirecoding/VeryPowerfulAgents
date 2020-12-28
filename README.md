@@ -16,7 +16,8 @@ Agents are lightweight microservices with built-in interprocess communications i
 
 - Pub/sub notification facilities
 - Router/client facilities
-- End-to-end elliptical curve encryption (TODO)
+- Simple Messaging protocol for standard facilities (notifications, client, etc ..)
+- End-to-end encryption support using ECC, RSA, AES (TODO)
 - Production ready communication architectures, lazy pirate, etc... (TODO)
 - Mesh networks (TODO)
 - ... (TODO)
@@ -113,7 +114,7 @@ INFO     [agent=client] received: [b'5']
 import zmq
 import time
 import threading
-from agents import PowerfulAgent
+from agents import PowerfulAgent, Message
 
 class NotificationBroker(PowerfulAgent):
 
@@ -136,15 +137,14 @@ class Sender(PowerfulAgent):
         while not self.exit_event.is_set(): 
             time.sleep(1)
             self.counter += 1
-            multipart_message = [str(self.counter).encode()]
-            self.log.info(f"publishing: {multipart_message}")
-            self.pub.send(multipart_message)
+            self.log.info(f"publishing: {self.counter}")
+            self.pub.send(Message.notification(payload=self.counter))
 
 class Listener(PowerfulAgent):
     
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.pub, self.sub = self.create_notification_client(pub_address, sub_address)
-        self.sub.observable.subscribe(lambda x: self.log.info(f"received: {x}"))
+        self.sub.observable.subscribe(lambda x: self.log.info(f"received: { Message.decode(x) }"))
 
 if __name__ == '__main__':
     broker = NotificationBroker(name='broker', pub_address='tcp://0.0.0.0:5000', sub_address='tcp://0.0.0.0:5001')
@@ -157,30 +157,30 @@ INFO     [agent=broker] booting up ...
 INFO     [agent=broker] running user setup ...
 INFO     [agent=broker] binding 9 socket on tcp://0.0.0.0:5001 ...
 INFO     [agent=broker] binding 10 socket on tcp://0.0.0.0:5000 ...
-INFO     [agent=broker] booted in 0.0019881725311279297 seconds ...
+INFO     [agent=broker] booted in 0.0032880306243896484 seconds ...
 INFO     [agent=broker] start processing sockets ...
 INFO     [agent=sender] booting up ...
 INFO     [agent=sender] running user setup ...
 INFO     [agent=sender] connecting 1 socket to tcp://0.0.0.0:5000 ...
 INFO     [agent=sender] connecting 2 socket to tcp://0.0.0.0:5001 ...
-INFO     [agent=sender] booted in 0.001065969467163086 seconds ...
+INFO     [agent=sender] booted in 0.0016701221466064453 seconds ...
 INFO     [agent=sender] start processing sockets ...
 INFO     [agent=listener] booting up ...
 INFO     [agent=listener] running user setup ...
 INFO     [agent=listener] connecting 1 socket to tcp://0.0.0.0:5000 ...
 INFO     [agent=listener] connecting 2 socket to tcp://0.0.0.0:5001 ...
-INFO     [agent=listener] booted in 0.0011589527130126953 seconds ...
+INFO     [agent=listener] booted in 0.0013346672058105469 seconds ...
 INFO     [agent=listener] start processing sockets ...
-INFO     [agent=sender] publishing: [b'1']
-INFO     [agent=listener] received: [b'1']
-INFO     [agent=sender] publishing: [b'2']
-INFO     [agent=listener] received: [b'2']
-INFO     [agent=sender] publishing: [b'3']
-INFO     [agent=listener] received: [b'3']
-INFO     [agent=sender] publishing: [b'4']
-INFO     [agent=listener] received: [b'4']
-INFO     [agent=sender] publishing: [b'5']
-INFO     [agent=listener] received: [b'5']
+INFO     [agent=sender] publishing: 1
+INFO     [agent=listener] received: 1
+INFO     [agent=sender] publishing: 2
+INFO     [agent=listener] received: 2
+INFO     [agent=sender] publishing: 3
+INFO     [agent=listener] received: 3
+INFO     [agent=sender] publishing: 4
+INFO     [agent=listener] received: 4
+INFO     [agent=sender] publishing: 5
+INFO     [agent=listener] received: 5
 ```
 
 ## Router Client
