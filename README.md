@@ -144,7 +144,7 @@ class Listener(PowerfulAgent):
     
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.pub, self.sub = self.create_notification_client(pub_address, sub_address)
-        self.sub.observable.subscribe(lambda x: self.log.info(f"received: { Message.decode(x) }"))
+        self.sub.observable.subscribe(lambda x: self.log.info(f"received: { Message.decode(x)['payload'] }"))
 
 if __name__ == '__main__':
     broker = NotificationBroker(name='broker', pub_address='tcp://0.0.0.0:5000', sub_address='tcp://0.0.0.0:5001')
