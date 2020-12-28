@@ -8,7 +8,7 @@ setup(
     author='shirecoding',
     author_email="shirecoding@gmail.com",
     install_requires=[
-        'zmq',
+        'pyzmq',
         'rx',
         'pyrsistent'
     ],
