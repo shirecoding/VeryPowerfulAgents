@@ -144,7 +144,7 @@ class Listener(PowerfulAgent):
     
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.pub, self.sub = self.create_notification_client(pub_address, sub_address)
-        self.sub.observable.subscribe(lambda x: self.log.info(f"received: { Message.decode(x)['payload'] }"))
+        self.sub.observable.subscribe(lambda x: self.log.info(f"received: { x['payload'] }"))
 
 if __name__ == '__main__':
     broker = NotificationBroker(name='broker', pub_address='tcp://0.0.0.0:5000', sub_address='tcp://0.0.0.0:5001')
@@ -189,7 +189,7 @@ INFO     [agent=listener] received: 5
 import zmq
 import time
 import threading
-from agents import PowerfulAgent
+from agents import PowerfulAgent, Message
 
 class Router(PowerfulAgent):
 
@@ -212,16 +212,15 @@ class Client1(PowerfulAgent):
         while not self.exit_event.is_set(): 
             time.sleep(1)
             self.counter += 1
-            target = 'client2'.encode('utf-8')
-            multipart_message = [ target, str(self.counter).encode() ]
-            self.log.info(f"send to {target}: {multipart_message}")
-            self.client.send(multipart_message)
+            target = 'client2'
+            self.log.info(f"send to {target}: {self.counter}")
+            self.client.send(Message.client(name=target, payload=self.counter))
 
 class Client2(PowerfulAgent):
     
     def setup(self, name=None, address=None):
         self.client = self.create_client(address)
-        self.client.observable.subscribe(lambda x: self.log.info(f"received: {x}"))
+        self.client.observable.subscribe(lambda x: self.log.info(f"received: {x['payload']}"))
 
 if __name__ == '__main__':
     router = Router(name='router', address='tcp://0.0.0.0:5000')
@@ -233,26 +232,26 @@ if __name__ == '__main__':
 INFO     [agent=router] booting up ...
 INFO     [agent=router] running user setup ...
 INFO     [agent=router] binding 6 socket on tcp://0.0.0.0:5000 ...
-INFO     [agent=router] booted in 0.0016148090362548828 seconds ...
+INFO     [agent=router] booted in 0.0019252300262451172 seconds ...
 INFO     [agent=router] start processing sockets ...
 INFO     [agent=client1] booting up ...
 INFO     [agent=client1] running user setup ...
 INFO     [agent=client1] connecting 5 socket to tcp://0.0.0.0:5000 ...
-INFO     [agent=client1] booted in 0.0007421970367431641 seconds ...
+INFO     [agent=client1] booted in 0.0019159317016601562 seconds ...
 INFO     [agent=client1] start processing sockets ...
 INFO     [agent=client2] booting up ...
 INFO     [agent=client2] running user setup ...
 INFO     [agent=client2] connecting 5 socket to tcp://0.0.0.0:5000 ...
-INFO     [agent=client2] booted in 0.0007507801055908203 seconds ...
+INFO     [agent=client2] booted in 0.0008869171142578125 seconds ...
 INFO     [agent=client2] start processing sockets ...
-INFO     [agent=client1] send to b'client2': [b'client2', b'1']
-INFO     [agent=client2] received: [b'client1', b'1']
-INFO     [agent=client1] send to b'client2': [b'client2', b'2']
-INFO     [agent=client2] received: [b'client1', b'2']
-INFO     [agent=client1] send to b'client2': [b'client2', b'3']
-INFO     [agent=client2] received: [b'client1', b'3']
-INFO     [agent=client1] send to b'client2': [b'client2', b'4']
-INFO     [agent=client2] received: [b'client1', b'4']
-INFO     [agent=client1] send to b'client2': [b'client2', b'5']
-INFO     [agent=client2] received: [b'client1', b'5']
+INFO     [agent=client1] send to client2: 1
+INFO     [agent=client2] received: 1
+INFO     [agent=client1] send to client2: 2
+INFO     [agent=client2] received: 2
+INFO     [agent=client1] send to client2: 3
+INFO     [agent=client2] received: 3
+INFO     [agent=client1] send to client2: 4
+INFO     [agent=client2] received: 4
+INFO     [agent=client1] send to client2: 5
+INFO     [agent=client2] received: 5
 ```

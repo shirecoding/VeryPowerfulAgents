@@ -1,4 +1,6 @@
 import zmq
+import rx
+from rx import operators as ops
 from .agent import Agent
 from .utils import Message
 
@@ -24,7 +26,7 @@ class PowerfulAgent(Agent):
         if zmq.IDENTITY not in options:
             options[zmq.IDENTITY] = self.name.encode('utf-8')
         dealer = self.connect_socket(zmq.DEALER, options, address)
-        return dealer
+        return dealer.update({'observable': dealer.observable.pipe(ops.map(Message.decode))})
 
     ####################################################################################################
     ## notifications pattern
@@ -63,4 +65,4 @@ class PowerfulAgent(Agent):
         pub = self.connect_socket(zmq.PUB, options, pub_address)
         sub = self.connect_socket(zmq.SUB, options, sub_address)
         sub.socket.subscribe(topics)
-        return pub, sub
+        return pub, sub.update({'observable': sub.observable.pipe(ops.map(Message.decode))})

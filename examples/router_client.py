@@ -1,7 +1,7 @@
 import zmq
 import time
 import threading
-from agents import PowerfulAgent
+from agents import PowerfulAgent, Message
 
 class Router(PowerfulAgent):
 
@@ -24,16 +24,15 @@ class Client1(PowerfulAgent):
         while not self.exit_event.is_set(): 
             time.sleep(1)
             self.counter += 1
-            target = 'client2'.encode('utf-8')
-            multipart_message = [ target, str(self.counter).encode() ]
-            self.log.info(f"send to {target}: {multipart_message}")
-            self.client.send(multipart_message)
+            target = 'client2'
+            self.log.info(f"send to {target}: {self.counter}")
+            self.client.send(Message.client(name=target, payload=self.counter))
 
 class Client2(PowerfulAgent):
     
     def setup(self, name=None, address=None):
         self.client = self.create_client(address)
-        self.client.observable.subscribe(lambda x: self.log.info(f"received: {x}"))
+        self.client.observable.subscribe(lambda x: self.log.info(f"received: {x['payload']}"))
 
 if __name__ == '__main__':
     router = Router(name='router', address='tcp://0.0.0.0:5000')

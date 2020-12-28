@@ -10,6 +10,7 @@ class Message():
     ##############################################################################
     
     NOTIFICATION = 0
+    CLIENT = 1
 
     @classmethod
     def notification(cls, topic='', payload=''):
@@ -17,6 +18,14 @@ class Message():
             topic.encode(),
             bytes([cls.NOTIFICATION]),
             json.dumps({ 'topic': topic, 'payload': payload }).encode()
+        ]
+
+    @classmethod
+    def client(cls, name='', payload=''):
+        return [
+            name.encode(),
+            bytes([cls.CLIENT]),
+            json.dumps({ 'payload': payload }).encode()
         ]
 
     ##############################################################################
@@ -28,9 +37,15 @@ class Message():
         """
         Parse zmq multipart buffer into message
         """
-        _, t, payload = multipart
+        
+        v, t, payload = multipart
         t = int.from_bytes(t, byteorder='big')
+
+        # notifications pattern
         if t == cls.NOTIFICATION:
+            return json.loads(payload.decode())
+        # outer/client pattern
+        if t == cls.CLIENT:
             return json.loads(payload.decode())
         else:
             return multipart
