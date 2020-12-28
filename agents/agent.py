@@ -161,6 +161,27 @@ class Agent():
                     except queue.Empty:
                         pass
 
+    ####################################################################################################
+    ## authentication
+    ####################################################################################################
+
+    def curve_server_config(self, server_private_key):
+        return {
+            zmq.CURVE_SERVER: 1,
+            zmq.CURVE_SECRETKEY: server_private_key
+        }
+
+    def curve_client_config(self, server_public_key, client_public_key, client_private_key):
+        return {
+            zmq.CURVE_SERVERKEY: server_public_key,
+            zmq.CURVE_PUBLICKEY: client_public_key,
+            zmq.CURVE_SECRETKEY: client_private_key
+        }
+
+    @classmethod
+    def curve_keypair(self):
+        return zmq.curve_keypair()
+
     ########################################################################################
     ## override
     ########################################################################################
