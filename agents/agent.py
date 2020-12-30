@@ -191,6 +191,10 @@ class Agent():
     def load_curve_certificate(cls, path):
         return auth.load_certificate(path)
 
+    @classmethod
+    def load_curve_certificates(cls, path):
+        return auth.load_certificates(path)
+
     ########################################################################################
     ## override
     ########################################################################################

@@ -12,11 +12,10 @@ class NotificationBroker(PowerfulAgent):
         # configure public key auth/encryption if private_key is provided
         options = self.curve_server_config(private_key) if private_key else {}
         self.create_notification_broker(pub_address, sub_address, options=options)
-
+        
         # start authenticator if client_certificates_path is provided
         if client_certificates_path:
-            self.start_authenticator(domain='*', certificates_path=client_certificates_path)
-        
+            self.auth = self.start_authenticator(domain='*', certificates_path=client_certificates_path)
         
 class Sender(PowerfulAgent):
     
@@ -56,26 +55,25 @@ class Listener(PowerfulAgent):
 
 if __name__ == '__main__':
 
-    with tempfile.TemporaryDirectory() as server_keys_path, \
-    tempfile.TemporaryDirectory() as listener_keys_path, \
-    tempfile.TemporaryDirectory() as listener2_keys_path:
+    with tempfile.TemporaryDirectory() as trusted_keys_path, \
+    tempfile.TemporaryDirectory() as untrusted_keys_path:
 
-        # create key pairs in corresponding directories, assume sender and broker are on the same machine and share the same keys
-        Agent.create_curve_certificates(server_keys_path, 'server')
-        Agent.create_curve_certificates(listener_keys_path, 'listener')
-        Agent.create_curve_certificates(listener2_keys_path, 'listener2')
+        # create key pairs in corresponding directories
+        Agent.create_curve_certificates(trusted_keys_path, 'server')
+        Agent.create_curve_certificates(trusted_keys_path, 'listener')
+        Agent.create_curve_certificates(untrusted_keys_path, 'listener2')
 
         # load key pairs
-        server_public_key, server_private_key = Agent.load_curve_certificate(os.path.join(server_keys_path, "server.key_secret"))
-        listener_public_key, listener_private_key = Agent.load_curve_certificate(os.path.join(listener_keys_path, "listener.key_secret"))
-        listener2_public_key, listener2_private_key = Agent.load_curve_certificate(os.path.join(listener2_keys_path, "listener2.key_secret"))
+        server_public_key, server_private_key = Agent.load_curve_certificate(os.path.join(trusted_keys_path, "server.key_secret"))
+        listener_public_key, listener_private_key = Agent.load_curve_certificate(os.path.join(trusted_keys_path, "listener.key_secret"))
+        listener2_public_key, listener2_private_key = Agent.load_curve_certificate(os.path.join(untrusted_keys_path, "listener2.key_secret"))
 
         broker = NotificationBroker(
             name='broker',
             pub_address='tcp://127.0.0.1:5000',
             sub_address='tcp://127.0.0.1:5001',
             private_key=server_private_key,
-            client_certificates_path=listener_keys_path
+            client_certificates_path=trusted_keys_path
         )
         sender = Sender(
             name='sender',

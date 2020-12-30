@@ -84,9 +84,11 @@ class PowerfulAgent(Agent):
             whitelist (list[str]): ip addresses to whitelist
             domain: (str): domain to apply authentication
         """
-
-        certificates_path = CURVE_ALLOW_ANY if not certificates_path else certificates_path
-        auth = ThreadAuthenticator(self.zmq_context)
+        if certificates_path:
+            self.log.info(f"trusted clients: {self.load_curve_certificates(certificates_path)}")
+        else:
+            certificates_path = CURVE_ALLOW_ANY
+        auth = ThreadAuthenticator(self.zmq_context, log=self.log)
         auth.start()
         if whitelist is not None:
             auth.allow(*whitelist)
@@ -95,5 +97,6 @@ class PowerfulAgent(Agent):
         else:
             auth.allow()
         auth.configure_curve(domain=domain, location=certificates_path)
+        self.log.info("authenticator started ...")
         return auth
 
