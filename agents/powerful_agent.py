@@ -1,8 +1,11 @@
-import zmq
 import rx
-from rx import operators as ops
+import zmq
+
 from .agent import Agent
 from .utils import Message
+from rx import operators as ops
+from zmq.auth.thread import ThreadAuthenticator
+from zmq.auth import CURVE_ALLOW_ANY
 
 class PowerfulAgent(Agent):
 
@@ -66,3 +69,31 @@ class PowerfulAgent(Agent):
         sub = self.connect_socket(zmq.SUB, options, sub_address)
         sub.socket.subscribe(topics)
         return pub, sub.update({'observable': sub.observable.pipe(ops.map(Message.decode))})
+
+    ####################################################################################################
+    ## authentication
+    ####################################################################################################
+
+    def start_authenticator(self, domain='*', whitelist=None, blacklist=None, certificates_path=None):
+        """ Starts ZAP Authenticator in thread
+
+        configure_curve must be called every time certificates are added or removed, in order to update the Authenticator’s state
+
+        Args:
+            certificates_path (str): path to client public keys to allow
+            whitelist (list[str]): ip addresses to whitelist
+            domain: (str): domain to apply authentication
+        """
+
+        certificates_path = CURVE_ALLOW_ANY if not certificates_path else certificates_path
+        auth = ThreadAuthenticator(self.zmq_context)
+        auth.start()
+        if whitelist is not None:
+            auth.allow(*whitelist)
+        elif blacklist is not None:
+            auth.deny(*blacklist)
+        else:
+            auth.allow()
+        auth.configure_curve(domain=domain, location=certificates_path)
+        return auth
+

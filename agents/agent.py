@@ -1,10 +1,10 @@
 import asyncio
 import logging
 import os
+import queue
 import sys
 import threading
 import time
-import queue
 import traceback
 import uuid
 import zmq
@@ -16,6 +16,7 @@ from rx.subject import Subject
 from signal import SIGINT
 from signal import SIGTERM
 from signal import signal
+from zmq import auth
 
 log = stdout_logger(__name__, level=logging.DEBUG)
 
@@ -179,8 +180,16 @@ class Agent():
         }
 
     @classmethod
-    def curve_keypair(self):
+    def curve_keypair(cls):
         return zmq.curve_keypair()
+
+    @classmethod
+    def create_curve_certificates(cls, path, name, metadata=None):
+        return auth.create_certificates(path, name, metadata=metadata)
+
+    @classmethod
+    def load_curve_certificate(cls, path):
+        return auth.load_certificate(path)
 
     ########################################################################################
     ## override
