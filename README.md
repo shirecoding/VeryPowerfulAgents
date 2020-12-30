@@ -17,8 +17,8 @@ Agents are lightweight microservices with built-in interprocess communications i
 - Pub/sub notification facilities
 - Router/client facilities
 - Simple Messaging protocol for standard facilities (notifications, client, etc ..)
-- End-to-end encryption support using ECC, RSA, AES (TODO)
-- Production ready communication architectures, lazy pirate, etc... (TODO)
+- Elliptical curve encryption and authentication
+- Production ready communication architectures
 - Mesh networks (TODO)
 - ... (TODO)
 
