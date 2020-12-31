@@ -9,6 +9,16 @@ from zmq.auth import CURVE_ALLOW_ANY
 
 class PowerfulAgent(Agent):
 
+    def __init__(self, *args, **kwargs):
+        self.zap = None
+        super().__init__(*args, **kwargs)
+
+    def _shutdown(self, signum, frame):
+        if self.zap:
+            self.log.info("stopping ZMQ Authenticator ...")
+            self.zap.stop()
+        super()._shutdown(signum, frame)
+
     ####################################################################################################
     ## router/client pattern
     ####################################################################################################
@@ -84,19 +94,14 @@ class PowerfulAgent(Agent):
             whitelist (list[str]): ip addresses to whitelist
             domain: (str): domain to apply authentication
         """
-        if certificates_path:
-            self.log.info(f"trusted clients: {self.load_curve_certificates(certificates_path)}")
-        else:
-            certificates_path = CURVE_ALLOW_ANY
-        auth = ThreadAuthenticator(self.zmq_context, log=self.log)
-        auth.start()
+        certificates_path = certificates_path if certificates_path else CURVE_ALLOW_ANY
+        self.zap = ThreadAuthenticator(self.zmq_context, log=self.log)
+        self.zap.start()
         if whitelist is not None:
-            auth.allow(*whitelist)
+            self.zap.allow(*whitelist)
         elif blacklist is not None:
-            auth.deny(*blacklist)
+            self.zap.deny(*blacklist)
         else:
-            auth.allow()
-        auth.configure_curve(domain=domain, location=certificates_path)
-        self.log.info("authenticator started ...")
-        return auth
-
+            self.zap.allow()
+        self.zap.configure_curve(domain=domain, location=certificates_path)
+        return self.zap

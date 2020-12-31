@@ -10,7 +10,8 @@ setup(
     install_requires=[
         'pyzmq',
         'rx',
-        'pyrsistent'
+        'pyrsistent',
+        'aiohttp[speedups]'
     ],
     url='https://github.com/shirecoding/VeryPowerfulAgents.git',
     download_url=f'https://github.com/shirecoding/VeryPowerfulAgents/archive/{__version__}.tar.gz',
