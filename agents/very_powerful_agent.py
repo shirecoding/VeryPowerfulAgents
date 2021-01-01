@@ -5,26 +5,22 @@ from .powerful_agent import PowerfulAgent
 from aiohttp import web
 
 class VeryPowerfulAgent(PowerfulAgent):
-    
-    def __init__(self, *args, **kwargs):
-        self.web = None
-        super().__init__(*args, **kwargs)
-
-    def _shutdown(self, signum, frame):
-        if self.web:
-            self.log.info("stopping aiohttp webserver ...")
-            self.web.stop()
-        super()._shutdown(signum, frame)
 
     ##########################################################################################
     ## http server
     ##########################################################################################
 
-    def start_http_server(self, host, port):
+    def start_http_server(self, host, port, routes=[]):
 
         def start():
             async def task():
                 app = web.Application()
+
+                # add routes
+                for action, route, handler in routes:
+                    self.log.info(f"adding http route {action} {route} ...")
+                    app.router.add_route(action, route, handler)
+
                 runner = web.AppRunner(app)
                 await runner.setup()
                 site = web.TCPSite(runner, host, port)
