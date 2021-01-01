@@ -6,6 +6,11 @@ from aiohttp import web
 
 class VeryPowerfulAgent(PowerfulAgent):
 
+    def _shutdown(self, signum, frame):
+        if hasattr(self, 'http_loop'):
+            self.http_loop.call_soon_threadsafe(self.http_loop.stop)
+        super()._shutdown(signum, frame)
+
     ##########################################################################################
     ## http server
     ##########################################################################################
@@ -25,18 +30,15 @@ class VeryPowerfulAgent(PowerfulAgent):
                 await runner.setup()
                 site = web.TCPSite(runner, host, port)
                 await site.start()
-
-                # sleep forever
-                while not self.exit_event.is_set():
-                    await asyncio.sleep(3600)  
             
-            loop = asyncio.new_event_loop()
+            self.http_loop = asyncio.new_event_loop()
             try:
                 self.log.info(f"starting http server on {host}:{port} ...")
-                loop.run_until_complete(task())
+                self.http_loop.create_task(task())
+                self.http_loop.run_forever()
             finally:
                 self.log.info(f"closing http server ...")
-                loop.close()
+                self.http_loop.close()
 
         t = threading.Thread(target=start)
         self.threads.append(t)
