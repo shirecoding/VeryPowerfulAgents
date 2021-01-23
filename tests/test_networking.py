@@ -1,13 +1,15 @@
 import zmq
+
 from agents import Agent
 
+
 class SimpleAgent(Agent):
-    
     def setup(self):
         pass
 
     def shutdown(self):
         pass
+
 
 def test_basic():
 

@@ -1,13 +1,14 @@
 import asyncio
 import threading
 
-from .powerful_agent import PowerfulAgent
 from aiohttp import web
 
-class VeryPowerfulAgent(PowerfulAgent):
+from .powerful_agent import PowerfulAgent
 
+
+class VeryPowerfulAgent(PowerfulAgent):
     def _shutdown(self, signum, frame):
-        if hasattr(self, 'http_loop'):
+        if hasattr(self, "http_loop"):
             self.http_loop.call_soon_threadsafe(self.http_loop.stop)
         super()._shutdown(signum, frame)
 
@@ -16,7 +17,6 @@ class VeryPowerfulAgent(PowerfulAgent):
     ##########################################################################################
 
     def start_http_server(self, host, port, routes=[]):
-
         def start():
             async def task():
                 app = web.Application()
@@ -30,7 +30,7 @@ class VeryPowerfulAgent(PowerfulAgent):
                 await runner.setup()
                 site = web.TCPSite(runner, host, port)
                 await site.start()
-            
+
             self.http_loop = asyncio.new_event_loop()
             try:
                 self.log.info(f"starting http server on {host}:{port} ...")
