@@ -1,12 +1,13 @@
 import json
 import logging
-import sys
 import os
 import shutil
-import h5py
-from signal import SIGINT, SIGTERM, signal
+import sys
 from collections import defaultdict
 from collections.abc import MutableMapping
+from signal import SIGINT, SIGTERM, signal
+
+import h5py
 
 ##############################################################################
 ## Message
@@ -119,9 +120,6 @@ class HDF5Store(MutableMapping):
 
     - hdf5 storage format
     - dictionary interface
-
-    - handles storage/access methods and formats based on data type
-    - partial access without loading the entire data
     - lru (least recently used) caching for large files
     - data expiration
     """

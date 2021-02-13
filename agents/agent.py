@@ -42,6 +42,9 @@ class Agent:
         t.start()
         self.initialized_event.wait()
 
+        # call hook
+        self.initialized_hook()
+
     def boot(self, *args, **kwargs):
         try:
             start = time.time()
@@ -78,6 +81,7 @@ class Agent:
         # join threads
         self.log.info("joining threads ...")
         for t in self.threads:
+            self.log.info(f"joining {t}")
             t.join()
 
         # destroy zmq sockets
@@ -199,8 +203,12 @@ class Agent:
     ########################################################################################
     ## override
     ########################################################################################
+
     def setup(self):
         pass
 
     def shutdown(self):
+        pass
+
+    def initialized_hook(self):
         pass
