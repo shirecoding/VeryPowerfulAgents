@@ -141,7 +141,7 @@ class HDF5Store(MutableMapping):
         signal(SIGTERM, self._shutdown)
         signal(SIGINT, self._shutdown)
 
-    def _shutdown(self):
+    def _shutdown(self, signum, frame):
         self.ledger.close()
 
     def __len__(self):
