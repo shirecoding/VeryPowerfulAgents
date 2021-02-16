@@ -99,7 +99,7 @@ class FileStore(MutableMapping):
         # set folder expiration
         from datetime import datetime, timedelta
         s.expire('books/history', datetime.now() + timedelta(hours=2))
-        s.expore('books/fiction', 'science'], datetime.now() + timedelta(hours=10))
+        s.expire('books/fiction', 'science'], datetime.now() + timedelta(hours=10))
         ```
     """
 
@@ -197,7 +197,7 @@ class HDF5Store(MutableMapping):
     def __init__(self, storage_path):
         # create storage_path parent directory
         self.storage_path = storage_path
-        Path(storage_path).mkdir(exist_ok=True, parents=True)
+        Path(storage_path).parent.mkdir(exist_ok=True, parents=True)
 
         # create hdf5 file if not exist
         if not os.path.isfile(self.storage_path):

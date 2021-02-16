@@ -1,6 +1,8 @@
+[![Documentation Status](https://readthedocs.org/projects/verypowerfulagents/badge/?version=latest)](https://verypowerfulagents.readthedocs.io/en/latest/?badge=latest)
+
 # VeryPowerfulAgents
 
-Agents are lightweight microservices with built-in interprocess communications infrastructure using ZeroMQ.
+Agents are lightweight microservices with built-in interprocess communications infrastructure using ZeroMQ
 
 ## Features
 
