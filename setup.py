@@ -23,7 +23,7 @@ setup(
             "numpy"
         ],
         "docs": ["mkdocs", "mkdocstrings"]
-    }
+    },
     url="https://github.com/shirecoding/VeryPowerfulAgents.git",
     download_url=f"https://github.com/shirecoding/VeryPowerfulAgents/archive/{__version__}.tar.gz",
     long_description=open("README.md").read(),
