@@ -1,2 +1,40 @@
 site_name: VeryPowerfulAgents
-theme: readthedocs
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - nagivation.tabs
+    - navigation.sections
+    - navigation.expand
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          selection:
+            docstring_style: "google"
+          rendering:
+            show_root_heading: no
+            show_category_heading: no
+extra_css:
+  - css/mkdocstrings.css
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: installation.md
+    - Quick Start: quickstart.md
+  - Reference:
+      agents:
+        - agent.py: agents/agent.md
+        - powerful_agent.py: agents/powerful-agent.md
+        - very_powerful_agent.py: agents/very-powerful-agent.md
+  - Examples:
+    - Simple Agent: examples/simple-agent.md
+    - Echo Server: examples/echo-server.md
+    - Notifications: examples/notifications.md
+    - Router Client: examples/router-client.md
+    - Simple Curve Authentication: examples/curve-auth.md
+    - Zap Curve Authentication: examples/zap-curve-auth.md

@@ -11,7 +11,7 @@ setup(
     install_requires=["pyzmq", "rx", "pyrsistent", "aiohttp[speedups]"],
     extras_require={
         "test": ["pytest", "pytest-cov", "pytest-html", "pytest-metadata", "numpy"],
-        "docs": ["mkdocs", "mkdocstrings"],
+        "docs": ["mkdocs", "mkdocstrings", "mkdocs-material"],
     },
     url="https://github.com/shirecoding/VeryPowerfulAgents.git",
     download_url=f"https://github.com/shirecoding/VeryPowerfulAgents/archive/{__version__}.tar.gz",
