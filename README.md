@@ -64,7 +64,7 @@ class EchoServer(Agent):
         self.connection.send(xs)
 
 class Client(Agent):
-    
+
     def setup(self, name=None, address=None):
         self.counter = 0
 
@@ -79,7 +79,7 @@ class Client(Agent):
 
     def send_forever(self):
         # use exit event to gracefully exit loop and graceful cleanup
-        while not self.exit_event.is_set(): 
+        while not self.exit_event.is_set():
             time.sleep(1)
             self.counter += 1
             multipart_message = [str(self.counter).encode()]
@@ -128,7 +128,7 @@ class NotificationBroker(PowerfulAgent):
         self.create_notification_broker(pub_address, sub_address)
 
 class Sender(PowerfulAgent):
-    
+
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.counter = 0
         self.pub, self.sub = self.create_notification_client(pub_address, sub_address)
@@ -140,14 +140,14 @@ class Sender(PowerfulAgent):
 
     def send_forever(self):
         # use exit event to gracefully exit loop and graceful cleanup
-        while not self.exit_event.is_set(): 
+        while not self.exit_event.is_set():
             time.sleep(1)
             self.counter += 1
             self.log.info(f"publishing: {self.counter}")
             self.pub.send(Message.notification(payload=self.counter))
 
 class Listener(PowerfulAgent):
-    
+
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.pub, self.sub = self.create_notification_client(pub_address, sub_address)
         self.sub.observable.subscribe(lambda x: self.log.info(f"received: { x['payload'] }"))
@@ -203,7 +203,7 @@ class Router(PowerfulAgent):
         self.create_router(address)
 
 class Client1(PowerfulAgent):
-    
+
     def setup(self, name=None, address=None):
         self.counter = 0
         self.client = self.create_client(address)
@@ -215,7 +215,7 @@ class Client1(PowerfulAgent):
 
     def send_forever(self):
         # use exit event to gracefully exit loop and graceful cleanup
-        while not self.exit_event.is_set(): 
+        while not self.exit_event.is_set():
             time.sleep(1)
             self.counter += 1
             target = 'client2'
@@ -223,7 +223,7 @@ class Client1(PowerfulAgent):
             self.client.send(Message.client(name=target, payload=self.counter))
 
 class Client2(PowerfulAgent):
-    
+
     def setup(self, name=None, address=None):
         self.client = self.create_client(address)
         self.client.observable.subscribe(lambda x: self.log.info(f"received: {x['payload']}"))
@@ -284,7 +284,7 @@ class NotificationBroker(PowerfulAgent):
         self.create_notification_broker(pub_address, sub_address, options=self.curve_server_config(server_private_key))
 
 class Sender(PowerfulAgent):
-    
+
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.counter = 0
         self.pub, self.sub = self.create_notification_client(
@@ -300,14 +300,14 @@ class Sender(PowerfulAgent):
 
     def send_forever(self):
         # use exit event to gracefully exit loop and graceful cleanup
-        while not self.exit_event.is_set(): 
+        while not self.exit_event.is_set():
             time.sleep(1)
             self.counter += 1
             self.log.info(f"publishing: {self.counter}")
             self.pub.send(Message.notification(payload=self.counter))
 
 class Listener(PowerfulAgent):
-    
+
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.pub, self.sub = self.create_notification_client(
             pub_address,
@@ -317,7 +317,7 @@ class Listener(PowerfulAgent):
         self.sub.observable.subscribe(lambda x: self.log.info(f"received: { x['payload'] }"))
 
 class ListenerInvalid(PowerfulAgent):
-    
+
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.pub, self.sub = self.create_notification_client(
             pub_address,
@@ -382,17 +382,17 @@ from agents import Agent, PowerfulAgent, Message
 class NotificationBroker(PowerfulAgent):
 
     def setup(self, name=None, pub_address=None, sub_address=None, private_key=None, client_certificates_path=None):
-        
+
         # configure public key auth/encryption if private_key is provided
         options = self.curve_server_config(private_key) if private_key else {}
         self.create_notification_broker(pub_address, sub_address, options=options)
-        
+
         # start authenticator if client_certificates_path is provided
         if client_certificates_path:
             self.auth = self.start_authenticator(domain='*', certificates_path=client_certificates_path)
-        
+
 class Sender(PowerfulAgent):
-    
+
     def setup(self, name=None, pub_address=None, sub_address=None, private_key=None, public_key=None, server_public_key=None):
         # configure public key auth/encryption if keys are provided
         if private_key and public_key and server_public_key:
@@ -409,14 +409,14 @@ class Sender(PowerfulAgent):
 
     def send_forever(self):
         # use exit event to gracefully exit loop and graceful cleanup
-        while not self.exit_event.is_set(): 
+        while not self.exit_event.is_set():
             time.sleep(1)
             self.counter += 1
             self.log.info(f"publishing: {self.counter}")
             self.pub.send(Message.notification(payload=self.counter))
 
 class Listener(PowerfulAgent):
-    
+
     def setup(self, name=None, pub_address=None, sub_address=None, private_key=None, public_key=None, server_public_key=None):
         # configure public key auth/encryption if keys are provided
         if private_key and public_key and server_public_key:
@@ -484,7 +484,7 @@ INFO     [agent=broker] trusted clients: {b'LJl(is$S!/A[3uj]lx}GosmI^28J+3TrR#N5
 DEBUG    [agent=broker] Starting
 INFO     [agent=broker] authenticator started ...
 DEBUG    [agent=broker] auth received API command b'ALLOW'
-DEBUG    [agent=broker] Allowing 
+DEBUG    [agent=broker] Allowing
 DEBUG    [agent=broker] auth received API command b'CURVE'
 DEBUG    [agent=broker] Configure curve: *[/var/folders/v2/9dzql1f509n1rqnlgrxs9_180000gn/T/tmp6f67aogg]
 INFO     [agent=broker] booted in 0.006651878356933594 seconds ...
