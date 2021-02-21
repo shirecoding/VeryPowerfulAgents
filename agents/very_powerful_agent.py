@@ -1,45 +1,38 @@
 import asyncio
 import threading
 
-from aiohttp import web
+from fastapi import FastAPI
 
 from .powerful_agent import PowerfulAgent
 
 
 class VeryPowerfulAgent(PowerfulAgent):
+
+    app = FastAPI()
+
     def _shutdown(self, signum, frame):
-        if hasattr(self, "http_loop"):
-            self.http_loop.call_soon_threadsafe(self.http_loop.stop)
+        # set uvicorn exit flag
+        if getattr(self, "rest"):
+            self.rest.should_exit = True
+
         super()._shutdown(signum, frame)
 
     ##########################################################################################
-    ## http server
+    ## REST api
     ##########################################################################################
 
-    def start_http_server(self, host, port, routes=[]):
-        def start():
-            async def task():
-                app = web.Application()
+    def start_rest_api(self, host, port, reload=True, debug=True, workers=3):
+        import uvicorn
 
-                # add routes
-                for action, route, handler in routes:
-                    self.log.info(f"adding http route {action} {route} ...")
-                    app.router.add_route(action, route, handler)
-
-                runner = web.AppRunner(app)
-                await runner.setup()
-                site = web.TCPSite(runner, host, port)
-                await site.start()
-
-            self.http_loop = asyncio.new_event_loop()
-            try:
-                self.log.info(f"starting http server on {host}:{port} ...")
-                self.http_loop.create_task(task())
-                self.http_loop.run_forever()
-            finally:
-                self.log.info(f"closing http server ...")
-                self.http_loop.close()
-
-        t = threading.Thread(target=start)
+        config = uvicorn.Config(
+            "agents:VeryPowerfulAgent.app",
+            host=host,
+            port=port,
+            reload=reload,
+            debug=debug,
+            workers=workers,
+        )
+        self.rest = uvicorn.Server(config=config)
+        t = threading.Thread(target=self.rest.run)
         self.threads.append(t)
         t.start()

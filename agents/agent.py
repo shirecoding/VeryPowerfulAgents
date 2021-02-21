@@ -68,7 +68,10 @@ class Agent:
             self.initialized_event.set()
             os.kill(os.getpid(), SIGINT)
 
-    def _shutdown(self, signum, frame):
+    def _shutdown_proc(self):
+        """
+        Shutdown procedure, usefull in testing to showdown agent without calling sys.exit(0)
+        """
         self.log.info("set exit event ...")
         self.exit_event.set()
 
@@ -91,6 +94,8 @@ class Agent:
             v["observable"].dispose()
         self.zmq_context.term()
 
+    def _shutdown(self, signum, frame):
+        self._shutdown_proc()
         sys.exit(0)
 
     ########################################################################################

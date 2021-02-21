@@ -26,12 +26,9 @@ def start_agents():
 
     yield (agent_one, agent_two, agent_three)
 
-    agent_one.initialized_event.set()
-    agent_one.exit_event.set()
-    agent_two.initialized_event.set()
-    agent_two.exit_event.set()
-    agent_three.initialized_event.set()
-    agent_three.exit_event.set()
+    agent_one._shutdown_proc()
+    agent_two._shutdown_proc()
+    agent_three._shutdown_proc()
 
 
 @pytest.mark.report(

@@ -8,7 +8,7 @@ setup(
     version=__version__,
     author="shirecoding",
     author_email="shirecoding@gmail.com",
-    install_requires=["pyzmq", "rx", "pyrsistent", "aiohttp[speedups]"],
+    install_requires=["pyzmq", "rx", "pyrsistent", "fastapi", "uvicorn"],
     extras_require={
         "test": ["pytest", "pytest-cov", "pytest-html", "pytest-metadata", "numpy"],
         "docs": ["mkdocs", "mkdocstrings", "mkdocs-material"],
