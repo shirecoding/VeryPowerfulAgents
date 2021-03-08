@@ -156,17 +156,20 @@ class Agent:
         self.log.info("start processing sockets ...")
 
         while not self.exit_event.is_set():
-            sockets = dict(self.zmq_poller.poll(50))
-            for k, v in self.zmq_sockets.items():
-                # receive socket into observable
-                if v.socket in sockets and sockets[v.socket] == zmq.POLLIN:
-                    v.observable.on_next(v.socket.recv_multipart())
-                # send queue to socket (zmq is not thread safe)
-                while not v.send_queue.empty() and not self.exit_event.is_set():
-                    try:
-                        v.socket.send_multipart(v.send_queue.get(block=False))
-                    except queue.Empty:
-                        pass
+            if self.zmq_sockets:
+                sockets = dict(self.zmq_poller.poll(50))
+                for k, v in self.zmq_sockets.items():
+                    # receive socket into observable
+                    if v.socket in sockets and sockets[v.socket] == zmq.POLLIN:
+                        v.observable.on_next(v.socket.recv_multipart())
+                    # send queue to socket (zmq is not thread safe)
+                    while not v.send_queue.empty() and not self.exit_event.is_set():
+                        try:
+                            v.socket.send_multipart(v.send_queue.get(block=False))
+                        except queue.Empty:
+                            pass
+            else:
+                time.sleep(1)
 
     ####################################################################################################
     ## authentication
