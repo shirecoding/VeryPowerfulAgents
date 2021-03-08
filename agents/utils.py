@@ -13,9 +13,7 @@ from itertools import cycle
 
 class Message:
 
-    ##############################################################################
-    ## message interface
-    ##############################################################################
+    # Message Interface
 
     NOTIFICATION = 0
     CLIENT = 1
@@ -36,9 +34,7 @@ class Message:
             json.dumps({"payload": payload}).encode(),
         ]
 
-    ##############################################################################
-    ## helper methods
-    ##############################################################################
+    # Helper Methods
 
     @classmethod
     def decode(cls, multipart):

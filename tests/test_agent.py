@@ -58,6 +58,7 @@ def test_socket(start_agents):
 
     pub = agent_one.bind_socket(zmq.PUB, {}, "tcp://0.0.0.0:5000")
     sub = agent_two.connect_socket(zmq.SUB, {}, "tcp://0.0.0.0:5000")
+    time.sleep(1)
 
     res = []
     sub.socket.subscribe("")
@@ -71,6 +72,7 @@ def test_socket(start_agents):
 
     rep = agent_one.bind_socket(zmq.REP, {}, "tcp://0.0.0.0:5001")
     req = agent_two.connect_socket(zmq.REQ, {}, "tcp://0.0.0.0:5001")
+    time.sleep(1)
 
     res = []
     d = rep.observable.subscribe(lambda x: res.append(x))
@@ -88,6 +90,7 @@ def test_socket(start_agents):
     dealer2 = agent_three.connect_socket(
         zmq.DEALER, {zmq.IDENTITY: b"dealer2"}, "tcp://0.0.0.0:5002"
     )
+    time.sleep(1)
 
     d = router.observable.subscribe(lambda x: router.send([x[1], x[2]]))
     res = []

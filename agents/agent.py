@@ -20,10 +20,13 @@ log = stdout_logger(__name__, level=logging.DEBUG)
 
 
 class Agent:
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, name=None, **kwargs):
 
         # extract special kwargs
-        self.name = kwargs["name"] if "name" in kwargs else uuid.uuid4().hex
+        if name:
+            self.name = name
+        else:
+            self.name = uuid.uuid4().hex
 
         self.log = Logger(log, {"agent": self.name})
         self.initialized_event = threading.Event()
