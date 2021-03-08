@@ -1,5 +1,6 @@
 import threading
 import time
+from signal import SIGINT, SIGTERM, signal
 
 import zmq
 
@@ -41,3 +42,11 @@ class Client(Agent):
 if __name__ == "__main__":
     echo_server = EchoServer(name="server", address="tcp://0.0.0.0:5000")
     client = Client(name="client", address="tcp://0.0.0.0:5000")
+
+    # override shutdown signals
+    def shutdown(signum, frame):
+        client.shutdown()
+        echo_server.shutdown()
+
+    signal(SIGTERM, shutdown)
+    signal(SIGINT, shutdown)

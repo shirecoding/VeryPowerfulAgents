@@ -17,18 +17,15 @@ def start_agents():
         def setup(self):
             pass
 
-        def shutdown(self):
-            pass
-
     agent_one = SimpleAgent()
     agent_two = SimpleAgent()
     agent_three = SimpleAgent()
 
     yield (agent_one, agent_two, agent_three)
 
-    agent_one._shutdown_proc()
-    agent_two._shutdown_proc()
-    agent_three._shutdown_proc()
+    agent_one.shutdown()
+    agent_two.shutdown()
+    agent_three.shutdown()
 
 
 @pytest.mark.report(
@@ -64,23 +61,25 @@ def test_socket(start_agents):
 
     res = []
     sub.socket.subscribe("")
-    sub.observable.subscribe(lambda x: res.append(x))
+    d = sub.observable.subscribe(lambda x: res.append(x))
     time.sleep(0.2)
     pub.send([b"topic", b"message"])
     time.sleep(0.2)
     log.debug(res)
     assert res[0] == [b"topic", b"message"]
+    d.dispose()
 
     rep = agent_one.bind_socket(zmq.REP, {}, "tcp://0.0.0.0:5001")
     req = agent_two.connect_socket(zmq.REQ, {}, "tcp://0.0.0.0:5001")
 
     res = []
-    rep.observable.subscribe(lambda x: res.append(x))
+    d = rep.observable.subscribe(lambda x: res.append(x))
     time.sleep(0.2)
     req.send([b"request"])
     time.sleep(0.2)
     log.debug(res)
     assert res[0] == [b"request"]
+    d.dispose()
 
     router = agent_one.bind_socket(zmq.ROUTER, {}, "tcp://0.0.0.0:5002")
     dealer = agent_two.connect_socket(
@@ -90,11 +89,13 @@ def test_socket(start_agents):
         zmq.DEALER, {zmq.IDENTITY: b"dealer2"}, "tcp://0.0.0.0:5002"
     )
 
-    router.observable.subscribe(lambda x: router.send([x[1], x[2]]))
+    d = router.observable.subscribe(lambda x: router.send([x[1], x[2]]))
     res = []
-    dealer2.observable.subscribe(lambda x: res.append(x))
+    d2 = dealer2.observable.subscribe(lambda x: res.append(x))
     time.sleep(0.2)
     dealer.send([b"dealer2", b"message"])
     time.sleep(0.2)
     log.debug(res)
     assert res[0] == [b"message"]
+    d.dispose()
+    d2.dispose()

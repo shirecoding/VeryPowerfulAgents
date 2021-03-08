@@ -68,18 +68,15 @@ class Agent:
             self.initialized_event.set()
             os.kill(os.getpid(), SIGINT)
 
-    def _shutdown_proc(self):
+    def shutdown(self):
         """
-        Shutdown procedure, usefull in testing to showdown agent without calling sys.exit(0)
+        Shutdown procedure, call super().shutdown() if overriding
         """
         self.log.info("set exit event ...")
         self.exit_event.set()
 
         self.log.info("wait for initialization before cleaning up ...")
         self.initialized_event.wait()
-
-        self.log.info("running user shutdown ...")
-        self.shutdown()
 
         # join threads
         self.log.info("joining threads ...")
@@ -91,12 +88,10 @@ class Agent:
         for k, v in self.zmq_sockets.items():
             self.log.info(f"closing socket {k} ...")
             v["socket"].close()
-            v["observable"].dispose()
         self.zmq_context.term()
 
     def _shutdown(self, signum, frame):
-        self._shutdown_proc()
-        sys.exit(0)
+        self.shutdown()
 
     ########################################################################################
     ## networking
@@ -210,9 +205,6 @@ class Agent:
     ########################################################################################
 
     def setup(self):
-        pass
-
-    def shutdown(self):
         pass
 
     def initialized_hook(self):
