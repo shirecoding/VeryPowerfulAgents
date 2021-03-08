@@ -1,6 +1,7 @@
 import rx
 import zmq
 from rx import operators as ops
+from rxpipes import Pipeline
 from zmq.auth import CURVE_ALLOW_ANY
 from zmq.auth.thread import ThreadAuthenticator
 
@@ -10,14 +11,18 @@ from .utils import Message
 
 class PowerfulAgent(Agent):
     def __init__(self, *args, **kwargs):
-        self.zap = None
+        self._zap = None
+        self._disposables = []
         super().__init__(*args, **kwargs)
 
-    def _shutdown(self, signum, frame):
-        if self.zap:
+    def shutdown(self):
+        if self._zap:
             self.log.info("stopping ZMQ Authenticator ...")
-            self.zap.stop()
-        super()._shutdown(signum, frame)
+            self._zap.stop()
+        for d in self._disposables:
+            self.log.info(f"dispose {d} ...")
+            d.dispose()
+        super().shutdown()
 
     ####################################################################################################
     ## router/client pattern
@@ -32,7 +37,7 @@ class PowerfulAgent(Agent):
             source, dest = x[0:2]
             router.send([dest, source] + x[2:])
 
-        router.observable.subscribe(route)
+        self._disposables.append(Pipeline.pipe()(router.observable, subscribe=route))
         return router
 
     def create_client(self, address, options=None):
@@ -63,8 +68,12 @@ class PowerfulAgent(Agent):
             options = {}
         xpub = self.bind_socket(zmq.XPUB, options, sub_address)
         xsub = self.bind_socket(zmq.XSUB, options, pub_address)
-        xsub.observable.subscribe(lambda x: xpub.send(x))
-        xpub.observable.subscribe(lambda x: xsub.send(x))
+        self._disposables.append(
+            Pipeline.pipe()(xsub.observable, subscribe=lambda x: xpub.send(x))
+        )
+        self._disposables.append(
+            Pipeline.pipe()(xpub.observable, subscribe=lambda x: xsub.send(x))
+        )
         return xsub, xpub
 
     def create_notification_client(
@@ -105,13 +114,13 @@ class PowerfulAgent(Agent):
             domain: (str): domain to apply authentication
         """
         certificates_path = certificates_path if certificates_path else CURVE_ALLOW_ANY
-        self.zap = ThreadAuthenticator(self.zmq_context, log=self.log)
-        self.zap.start()
+        self._zap = ThreadAuthenticator(self.zmq_context, log=self.log)
+        self._zap.start()
         if whitelist is not None:
-            self.zap.allow(*whitelist)
+            self._zap.allow(*whitelist)
         elif blacklist is not None:
-            self.zap.deny(*blacklist)
+            self._zap.deny(*blacklist)
         else:
-            self.zap.allow()
-        self.zap.configure_curve(domain=domain, location=certificates_path)
-        return self.zap
+            self._zap.allow()
+        self._zap.configure_curve(domain=domain, location=certificates_path)
+        return self._zap

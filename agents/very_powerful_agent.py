@@ -10,12 +10,12 @@ class VeryPowerfulAgent(PowerfulAgent):
 
     app = FastAPI()
 
-    def _shutdown(self, signum, frame):
+    def shutdown(self):
         # set uvicorn exit flag
         if getattr(self, "rest"):
             self.rest.should_exit = True
 
-        super()._shutdown(signum, frame)
+        super().shutdown()
 
     ##########################################################################################
     ## REST api

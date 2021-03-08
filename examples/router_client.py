@@ -1,7 +1,9 @@
 import threading
 import time
+from signal import SIGINT, SIGTERM, signal
 
 import zmq
+from rxpipes import Pipeline
 
 from agents import Message, PowerfulAgent
 
@@ -34,8 +36,12 @@ class Client1(PowerfulAgent):
 class Client2(PowerfulAgent):
     def setup(self, name=None, address=None):
         self.client = self.create_client(address)
-        self.client.observable.subscribe(
-            lambda x: self.log.info(f"received: {x['payload']}")
+
+        self._disposables.append(
+            Pipeline.pipe()(
+                self.client.observable,
+                subscribe=lambda x: self.log.info(f"received: {x['payload']}"),
+            )
         )
 
 
@@ -43,3 +49,12 @@ if __name__ == "__main__":
     router = Router(name="router", address="tcp://0.0.0.0:5000")
     client1 = Client1(name="client1", address="tcp://0.0.0.0:5000")
     client2 = Client2(name="client2", address="tcp://0.0.0.0:5000")
+
+    # override shutdown signals
+    def shutdown(signum, frame):
+        client1.shutdown()
+        client2.shutdown()
+        router.shutdown()
+
+    signal(SIGTERM, shutdown)
+    signal(SIGINT, shutdown)

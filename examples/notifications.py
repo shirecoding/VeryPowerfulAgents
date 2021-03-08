@@ -1,7 +1,9 @@
 import threading
 import time
+from signal import SIGINT, SIGTERM, signal
 
 import zmq
+from rxpipes import Pipeline
 
 from agents import Message, PowerfulAgent
 
@@ -33,8 +35,12 @@ class Sender(PowerfulAgent):
 class Listener(PowerfulAgent):
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.pub, self.sub = self.create_notification_client(pub_address, sub_address)
-        self.sub.observable.subscribe(
-            lambda x: self.log.info(f"received: { x['payload'] }")
+
+        self._disposables.append(
+            Pipeline.pipe()(
+                self.sub.observable,
+                subscribe=lambda x: self.log.info(f"received: { x['payload'] }"),
+            )
         )
 
 
@@ -54,3 +60,12 @@ if __name__ == "__main__":
         pub_address="tcp://0.0.0.0:5000",
         sub_address="tcp://0.0.0.0:5001",
     )
+
+    # override shutdown signals
+    def shutdown(signum, frame):
+        sender.shutdown()
+        listener.shutdown()
+        broker.shutdown()
+
+    signal(SIGTERM, shutdown)
+    signal(SIGINT, shutdown)
