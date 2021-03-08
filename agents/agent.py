@@ -92,7 +92,6 @@ class Agent:
 
     def _shutdown(self, signum, frame):
         self.shutdown()
-        sys.exit(0)
 
     ########################################################################################
     ## networking

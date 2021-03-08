@@ -1,5 +1,6 @@
 import threading
 import time
+from signal import SIGINT, SIGTERM, signal
 
 import zmq
 
@@ -95,3 +96,13 @@ if __name__ == "__main__":
         pub_address="tcp://0.0.0.0:5000",
         sub_address="tcp://0.0.0.0:5001",
     )
+
+    # override shutdown signals
+    def shutdown(signum, frame):
+        listener.shutdown()
+        listener_invalid.shutdown()
+        sender.shutdown()
+        broker.shutdown()
+
+    signal(SIGTERM, shutdown)
+    signal(SIGINT, shutdown)

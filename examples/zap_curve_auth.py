@@ -2,6 +2,7 @@ import os
 import tempfile
 import threading
 import time
+from signal import SIGINT, SIGTERM, signal
 
 import zmq
 
@@ -141,3 +142,13 @@ if __name__ == "__main__":
             public_key=listener2_public_key,
             server_public_key=server_public_key,
         )
+
+        # override shutdown signals
+        def shutdown(signum, frame):
+            listener.shutdown()
+            listener2.shutdown()
+            sender.shutdown()
+            broker.shutdown()
+
+        signal(SIGTERM, shutdown)
+        signal(SIGINT, shutdown)

@@ -20,7 +20,7 @@ class PowerfulAgent(Agent):
             self.log.info("stopping ZMQ Authenticator ...")
             self._zap.stop()
         for d in self._disposables:
-            self.log.info(f"dispose {d} ...")
+            self.log.info(f"disposing {d} ...")
             d.dispose()
         super().shutdown()
 
@@ -37,7 +37,7 @@ class PowerfulAgent(Agent):
             source, dest = x[0:2]
             router.send([dest, source] + x[2:])
 
-        self._disposables.append(Pipeline.pipe()(router.observable, subscribe=route))
+        self._disposables.append(Pipeline()(router.observable, subscribe=route))
         return router
 
     def create_client(self, address, options=None):
@@ -69,10 +69,10 @@ class PowerfulAgent(Agent):
         xpub = self.bind_socket(zmq.XPUB, options, sub_address)
         xsub = self.bind_socket(zmq.XSUB, options, pub_address)
         self._disposables.append(
-            Pipeline.pipe()(xsub.observable, subscribe=lambda x: xpub.send(x))
+            Pipeline()(xsub.observable, subscribe=lambda x: xpub.send(x))
         )
         self._disposables.append(
-            Pipeline.pipe()(xpub.observable, subscribe=lambda x: xsub.send(x))
+            Pipeline()(xpub.observable, subscribe=lambda x: xsub.send(x))
         )
         return xsub, xpub
 
