@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 import queue
@@ -45,8 +44,8 @@ class Agent:
         t.start()
         self.initialized_event.wait()
 
-        # call hook
-        self.initialized_hook()
+        # call initialized hook
+        self.initialized()
 
     def boot(self, *args, **kwargs):
         try:
@@ -156,7 +155,9 @@ class Agent:
 
         # wait for initialization
         self.initialized_event.wait()
-        self.log.info("start processing sockets ...")
+        self.log.info(
+            f"start processing sockets in thread {threading.current_thread()} ..."
+        )
 
         while not self.exit_event.is_set():
             if self.zmq_sockets:
@@ -213,5 +214,5 @@ class Agent:
     def setup(self):
         pass
 
-    def initialized_hook(self):
+    def initialized(self):
         pass
