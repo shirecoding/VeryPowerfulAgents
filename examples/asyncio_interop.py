@@ -7,15 +7,15 @@ import rx
 import zmq
 from rxpipes import Pipeline, observable_to_async_iterable
 
-from agents import Message, PowerfulAgent
+from agents import Agent, Message
 
 
-class Router(PowerfulAgent):
+class Router(Agent):
     def setup(self, name=None, address=None):
         self.create_router(address)
 
 
-class Client1(PowerfulAgent):
+class Client1(Agent):
     def setup(self, name=None, address=None):
         self.counter = 0
         self.client = self.create_client(address)
@@ -30,7 +30,7 @@ class Client1(PowerfulAgent):
         self.client.send(Message.client(name=target, payload=self.counter))
 
 
-class Client2(PowerfulAgent):
+class Client2(Agent):
     def setup(self, loop, name=None, address=None):
         self.client = self.create_client(address)
         self.loop = loop

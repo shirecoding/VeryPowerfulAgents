@@ -1,3 +1,6 @@
+__all__ = ["Message", "Agent"]
+
+import json
 import logging
 import os
 import queue
@@ -8,14 +11,61 @@ import traceback
 import uuid
 from signal import SIGINT, SIGTERM, signal
 
+import rx
 import zmq
 from pyrsistent import pmap
+from rx import operators as ops
 from rx.subject import Subject
+from rxpipes import Pipeline
 from zmq import auth
+from zmq.auth import CURVE_ALLOW_ANY
+from zmq.auth.thread import ThreadAuthenticator
 
 from .utils import Logger, stdout_logger
 
 log = stdout_logger(__name__, level=logging.DEBUG)
+
+
+class Message:
+
+    NOTIFICATION = 0
+    CLIENT = 1
+
+    @classmethod
+    def notification(cls, topic="", payload=""):
+        return [
+            topic.encode(),
+            bytes([cls.NOTIFICATION]),
+            json.dumps({"topic": topic, "payload": payload}).encode(),
+        ]
+
+    @classmethod
+    def client(cls, name="", payload=""):
+        return [
+            name.encode(),
+            bytes([cls.CLIENT]),
+            json.dumps({"payload": payload}).encode(),
+        ]
+
+    # Helper Methods
+
+    @classmethod
+    def decode(cls, multipart):
+        """
+        Parse zmq multipart buffer into message
+        """
+
+        v, t, payload = multipart
+        t = int.from_bytes(t, byteorder="big")
+
+        # notifications pattern
+        if t == cls.NOTIFICATION:
+            return json.loads(payload.decode())
+        # router/client pattern
+        if t == cls.CLIENT:
+            return json.loads(payload.decode())
+        else:
+            return multipart
 
 
 class Agent:
@@ -33,6 +83,8 @@ class Agent:
         self.zmq_sockets = {}
         self.zmq_poller = zmq.Poller()
         self.threads = []
+        self.disposables = []
+        self.zap = None
 
         # signals for graceful shutdown
         signal(SIGTERM, self._shutdown)
@@ -74,6 +126,17 @@ class Agent:
         """
         Shutdown procedure, call super().shutdown() if overriding
         """
+
+        # stop authenticator
+        if self.zap:
+            self.log.info("stopping ZMQ Authenticator ...")
+            self.zap.stop()
+
+        # dispose observables
+        for d in self.disposables:
+            self.log.info(f"disposing {d} ...")
+            d.dispose()
+
         self.log.info("set exit event ...")
         self.exit_event.set()
 
@@ -175,9 +238,82 @@ class Agent:
             else:
                 time.sleep(1)
 
-    ####################################################################################################
+    ########################################################################################
+    ## router/client pattern
+    ########################################################################################
+
+    def create_router(self, address, options=None):
+        if options is None:
+            options = {}
+        router = self.bind_socket(zmq.ROUTER, options, address)
+
+        def route(x):
+            source, dest = x[0:2]
+            router.send([dest, source] + x[2:])
+
+        self.disposables.append(Pipeline()(router.observable, subscribe=route))
+        return router
+
+    def create_client(self, address, options=None):
+        if options is None:
+            options = {}
+        if zmq.IDENTITY not in options:
+            options[zmq.IDENTITY] = self.name.encode("utf-8")
+        dealer = self.connect_socket(zmq.DEALER, options, address)
+        return dealer.update(
+            {"observable": dealer.observable.pipe(ops.map(Message.decode))}
+        )
+
+    ########################################################################################
+    ## notifications pattern
+    ########################################################################################
+
+    def create_notification_broker(self, pub_address, sub_address, options=None):
+        """Starts a pub-sub notifications broker
+
+        Args:
+            pub_address (str): agents publish to this address to notify other agents
+            sub_address (str): agents listen on this address for notifications
+
+        Returns:
+            connections (pub, sub)
+        """
+        if options is None:
+            options = {}
+        xpub = self.bind_socket(zmq.XPUB, options, sub_address)
+        xsub = self.bind_socket(zmq.XSUB, options, pub_address)
+        self.disposables.append(
+            Pipeline()(xsub.observable, subscribe=lambda x: xpub.send(x))
+        )
+        self.disposables.append(
+            Pipeline()(xpub.observable, subscribe=lambda x: xsub.send(x))
+        )
+        return xsub, xpub
+
+    def create_notification_client(
+        self, pub_address, sub_address, options=None, topics=""
+    ):
+        """Creates 2 connections (pub, sub) to a notifications broker
+
+        Args:
+            pub_address (str): publish to this address to notify other agents
+            sub_address (str): listen on this address for notifications
+
+        Returns:
+            connections (pub, sub)
+        """
+        if options is None:
+            options = {}
+        pub = self.connect_socket(zmq.PUB, options, pub_address)
+        sub = self.connect_socket(zmq.SUB, options, sub_address)
+        sub.socket.subscribe(topics)
+        return pub, sub.update(
+            {"observable": sub.observable.pipe(ops.map(Message.decode))}
+        )
+
+    ########################################################################################
     ## authentication
-    ####################################################################################################
+    ########################################################################################
 
     def curve_server_config(self, server_private_key):
         return {zmq.CURVE_SERVER: 1, zmq.CURVE_SECRETKEY: server_private_key}
@@ -206,6 +342,30 @@ class Agent:
     @classmethod
     def load_curve_certificates(cls, path):
         return auth.load_certificates(path)
+
+    def start_authenticator(
+        self, domain="*", whitelist=None, blacklist=None, certificates_path=None
+    ):
+        """Starts ZAP Authenticator in thread
+
+        configure_curve must be called every time certificates are added or removed, in order to update the Authenticator’s state
+
+        Args:
+            certificates_path (str): path to client public keys to allow
+            whitelist (list[str]): ip addresses to whitelist
+            domain: (str): domain to apply authentication
+        """
+        certificates_path = certificates_path if certificates_path else CURVE_ALLOW_ANY
+        self.zap = ThreadAuthenticator(self.zmq_context, log=self.log)
+        self.zap.start()
+        if whitelist is not None:
+            self.zap.allow(*whitelist)
+        elif blacklist is not None:
+            self.zap.deny(*blacklist)
+        else:
+            self.zap.allow()
+        self.zap.configure_curve(domain=domain, location=certificates_path)
+        return self.zap
 
     ########################################################################################
     ## override

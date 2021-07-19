@@ -4,7 +4,7 @@ from signal import SIGINT, SIGTERM, signal
 
 import zmq
 
-from agents import Agent, Message, PowerfulAgent
+from agents import Agent, Message
 
 # generate public and private keys for server and client
 server_public_key, server_private_key = Agent.curve_keypair()
@@ -13,7 +13,7 @@ client_public_key, client_private_key = Agent.curve_keypair()
 client2_public_key, client2_private_key = Agent.curve_keypair()
 
 
-class NotificationBroker(PowerfulAgent):
+class NotificationBroker(Agent):
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.create_notification_broker(
             pub_address,
@@ -22,7 +22,7 @@ class NotificationBroker(PowerfulAgent):
         )
 
 
-class Sender(PowerfulAgent):
+class Sender(Agent):
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.counter = 0
         self.pub, self.sub = self.create_notification_client(
@@ -47,7 +47,7 @@ class Sender(PowerfulAgent):
             self.pub.send(Message.notification(payload=self.counter))
 
 
-class Listener(PowerfulAgent):
+class Listener(Agent):
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.pub, self.sub = self.create_notification_client(
             pub_address,
@@ -61,7 +61,7 @@ class Listener(PowerfulAgent):
         )
 
 
-class ListenerInvalid(PowerfulAgent):
+class ListenerInvalid(Agent):
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.pub, self.sub = self.create_notification_client(
             pub_address,

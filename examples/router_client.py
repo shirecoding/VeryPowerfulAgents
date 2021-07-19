@@ -5,15 +5,15 @@ from signal import SIGINT, SIGTERM, signal
 import zmq
 from rxpipes import Pipeline
 
-from agents import Message, PowerfulAgent
+from agents import Agent, Message
 
 
-class Router(PowerfulAgent):
+class Router(Agent):
     def setup(self, name=None, address=None):
         self.create_router(address)
 
 
-class Client1(PowerfulAgent):
+class Client1(Agent):
     def setup(self, name=None, address=None):
         self.counter = 0
         self.client = self.create_client(address)
@@ -33,11 +33,11 @@ class Client1(PowerfulAgent):
             self.client.send(Message.client(name=target, payload=self.counter))
 
 
-class Client2(PowerfulAgent):
+class Client2(Agent):
     def setup(self, name=None, address=None):
         self.client = self.create_client(address)
 
-        self._disposables.append(
+        self.disposables.append(
             Pipeline.pipe()(
                 self.client.observable,
                 subscribe=lambda x: self.log.info(f"received: {x['payload']}"),

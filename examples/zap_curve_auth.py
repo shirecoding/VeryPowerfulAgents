@@ -6,10 +6,10 @@ from signal import SIGINT, SIGTERM, signal
 
 import zmq
 
-from agents import Agent, Message, PowerfulAgent
+from agents import Agent, Message
 
 
-class NotificationBroker(PowerfulAgent):
+class NotificationBroker(Agent):
     def setup(
         self,
         name=None,
@@ -30,7 +30,7 @@ class NotificationBroker(PowerfulAgent):
             )
 
 
-class Sender(PowerfulAgent):
+class Sender(Agent):
     def setup(
         self,
         name=None,
@@ -66,7 +66,7 @@ class Sender(PowerfulAgent):
             self.pub.send(Message.notification(payload=self.counter))
 
 
-class Listener(PowerfulAgent):
+class Listener(Agent):
     def setup(
         self,
         name=None,

@@ -11,10 +11,6 @@ import h5py
 
 from .utils import delete_directory
 
-##############################################################################
-## PickleDictionary
-##############################################################################
-
 
 def _none():
     """allow defaultdict to be pickled"""
@@ -24,6 +20,11 @@ def _none():
 def _ddnone():
     """allow defaultdict to be pickled"""
     return defaultdict(_none)
+
+
+##############################################################################
+## PickleDictionary
+##############################################################################
 
 
 class PickleDictionary(MutableMapping):

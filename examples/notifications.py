@@ -5,15 +5,15 @@ from signal import SIGINT, SIGTERM, signal
 import zmq
 from rxpipes import Pipeline
 
-from agents import Message, PowerfulAgent
+from agents import Agent, Message
 
 
-class NotificationBroker(PowerfulAgent):
+class NotificationBroker(Agent):
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.create_notification_broker(pub_address, sub_address)
 
 
-class Sender(PowerfulAgent):
+class Sender(Agent):
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.counter = 0
         self.pub, self.sub = self.create_notification_client(pub_address, sub_address)
@@ -32,11 +32,11 @@ class Sender(PowerfulAgent):
             self.pub.send(Message.notification(payload=self.counter))
 
 
-class Listener(PowerfulAgent):
+class Listener(Agent):
     def setup(self, name=None, pub_address=None, sub_address=None):
         self.pub, self.sub = self.create_notification_client(pub_address, sub_address)
 
-        self._disposables.append(
+        self.disposables.append(
             Pipeline.pipe()(
                 self.sub.observable,
                 subscribe=lambda x: self.log.info(f"received: { x['payload'] }"),
