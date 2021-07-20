@@ -1,5 +1,6 @@
 __all__ = ["Message", "Agent"]
 
+import asyncio
 import json
 import logging
 import os
@@ -13,10 +14,11 @@ from signal import SIGINT, SIGTERM, signal
 
 import rx
 import zmq
+from aiohttp import WSCloseCode, WSMsgType, web
 from pyrsistent import pmap
 from rx import operators as ops
 from rx.subject import Subject
-from rxpipes import Pipeline
+from rxpipes import Pipeline, observable_to_async_iterable
 from zmq import auth
 from zmq.auth import CURVE_ALLOW_ANY
 from zmq.auth.thread import ThreadAuthenticator
@@ -85,6 +87,7 @@ class Agent:
         self.threads = []
         self.disposables = []
         self.zap = None
+        self.web_application = None
 
         # signals for graceful shutdown
         signal(SIGTERM, self._shutdown)
@@ -108,6 +111,35 @@ class Agent:
             # user setup
             self.log.info("running user setup ...")
             self.setup(*args, **kwargs)
+
+            # start webserver
+            if self.web_application:
+                self.log.info("starting webserver ...")
+
+                async def _until_exit():
+                    while not self.exit_event.is_set():
+                        await asyncio.sleep(1)
+
+                def _run_server_thread():
+                    try:
+                        loop = asyncio.new_event_loop()
+                        runner = web.AppRunner(self.web_application)
+                        asyncio.set_event_loop(loop)
+                        self.web_application["loop"] = loop
+                        loop.run_until_complete(runner.setup())
+                        site = web.TCPSite(
+                            runner,
+                            self.web_application["host"],
+                            self.web_application["port"],
+                        )
+                        loop.run_until_complete(site.start())
+                        loop.run_until_complete(_until_exit())
+                    finally:
+                        loop.close()
+
+                t = threading.Thread(target=_run_server_thread)
+                self.threads.append(t)
+                t.start()
 
             # process sockets
             t = threading.Thread(target=self.process_sockets)
@@ -148,6 +180,7 @@ class Agent:
         for t in self.threads:
             self.log.info(f"joining {t}")
             t.join()
+        self.log.info("joining threads complete ...")
 
         # destroy zmq sockets
         for k, v in self.zmq_sockets.items():
@@ -310,6 +343,75 @@ class Agent:
         return pub, sub.update(
             {"observable": sub.observable.pipe(ops.map(Message.decode))}
         )
+
+    ########################################################################################
+    ## webserver
+    ########################################################################################
+
+    def create_webserver(self, host, port):
+        self.web_application = web.Application()
+        self.web_application["host"] = host
+        self.web_application["port"] = port
+        self.web_application["websockets"] = set()
+        self.web_application.on_shutdown.append(self.webserver_shutdown)
+        return self.web_application
+
+    async def webserver_shutdown(self, *args, **kwargs):
+        self.log.debug("closing websockets ...")
+        for ws in self.web_application["websockets"]:
+            await ws.close(code=WSCloseCode.GOING_AWAY, message="Server shutdown")
+        self.shutdown()
+
+    ########################################################################################
+    ## websockets
+    ########################################################################################
+
+    def create_websocket(self, route):
+
+        if not self.web_application:
+            raise Exception("Requires web_application, run create_webserver first")
+
+        tx = Subject()
+        rx = Subject()
+        self.disposables += [tx, rx]
+
+        async def websocket_handler(request):
+
+            ws = web.WebSocketResponse()
+            await ws.prepare(request)
+            self.web_application["websockets"].add(ws)
+            ws_exit_event = threading.Event()
+            self.log.debug("creating websocket connection ...")
+
+            async def rx_loop():
+                while not any([self.exit_event.is_set(), ws_exit_event.is_set()]):
+                    msg = await ws.receive()
+                    if msg.type == WSMsgType.ERROR:
+                        self.log(
+                            "ws connection closed with exception %s" % ws.exception()
+                        )
+                        ws_exit_event.set()
+                    else:
+                        rx.on_next((request, msg))
+
+            async def tx_loop():
+                xs = observable_to_async_iterable(tx, self.web_application["loop"])
+                while not any([self.exit_event.is_set(), ws_exit_event.is_set()]):
+                    await ws.send_str(await xs.__anext__())
+
+            try:
+                await asyncio.gather(rx_loop(), tx_loop())
+
+            finally:
+                self.web_application["websockets"].discard(ws)
+                tx.dispose()
+                rx.dispose()
+
+            return ws
+
+        self.web_application.add_routes([web.get(route, websocket_handler)])
+
+        return rx, tx
 
     ########################################################################################
     ## authentication
