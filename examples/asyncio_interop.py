@@ -21,7 +21,11 @@ class Client1(Agent):
         self.client = self.create_client(address)
 
     def initialized(self):
-        Pipeline().take(5)(rx.interval(0.5), subscribe=self.send_message)
+        self.disposables.append(
+            Pipeline.take(5)
+            .to_observable(rx.interval(0.5))
+            .subscribe(self.send_message)
+        )
 
     def send_message(self, x):
         self.counter += 1
@@ -36,7 +40,7 @@ class Client2(Agent):
         self.loop = loop
 
     async def task(self, loop):
-        obs = Pipeline().take(5)(self.client.observable, return_observable=True)
+        obs = Pipeline.take(5).to_observable(self.client.observable)
         async for x in observable_to_async_iterable(obs, loop):
             self.log.info(f"received: {x['payload']}")
 

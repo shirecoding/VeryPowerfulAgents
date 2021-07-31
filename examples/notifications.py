@@ -3,7 +3,6 @@ import time
 from signal import SIGINT, SIGTERM, signal
 
 import zmq
-from rxpipes import Pipeline
 
 from agents import Agent, Message
 
@@ -37,9 +36,8 @@ class Listener(Agent):
         self.pub, self.sub = self.create_notification_client(pub_address, sub_address)
 
         self.disposables.append(
-            Pipeline.pipe()(
-                self.sub.observable,
-                subscribe=lambda x: self.log.info(f"received: { x['payload'] }"),
+            self.sub.observable.subscribe(
+                lambda x: self.log.info(f"received: { x['payload'] }")
             )
         )
 

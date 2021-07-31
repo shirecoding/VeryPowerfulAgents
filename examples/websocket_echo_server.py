@@ -44,20 +44,20 @@ class WebServer(Agent):
 
         self.host = host
         self.port = port
-        app = self.create_webserver(host, port)
-        app.add_routes([web.get("/", self.echo)])
+        self.route = route
+        self.create_webserver(host, port)
+        self.create_route("GET", "/", self.echo)
         self.rx, self.tx = self.create_websocket(route)
         self.disposables.append(
-            Pipeline.filter(lambda xs: xs[1].type == WSMsgType.TEXT)(
-                self.rx, subscribe=lambda xs: self.tx.on_next(xs[1].data)
-            )
+            self.rx.subscribe(lambda xs: self.tx.on_next(xs[1].data))
         )
 
     async def echo(self, request):
         return web.Response(
-            text=self.html.format(self.host, self.port), content_type="text/html"
+            text=self.html.format(self.host, self.port, self.route),
+            content_type="text/html",
         )
 
 
 if __name__ == "__main__":
-    webserver = WebServer("127.0.0.1", 8080, "ws")
+    webserver = WebServer("127.0.0.1", 8080, "/ws")

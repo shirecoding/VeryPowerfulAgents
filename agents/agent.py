@@ -18,7 +18,7 @@ from aiohttp import WSCloseCode, WSMsgType, web
 from pyrsistent import pmap
 from rx import operators as ops
 from rx.subject import Subject
-from rxpipes import Pipeline, observable_to_async_iterable
+from rxpipes import observable_to_async_iterable
 from zmq import auth
 from zmq.auth import CURVE_ALLOW_ANY
 from zmq.auth.thread import ThreadAuthenticator
@@ -284,7 +284,7 @@ class Agent:
             source, dest = x[0:2]
             router.send([dest, source] + x[2:])
 
-        self.disposables.append(Pipeline()(router.observable, subscribe=route))
+        self.disposables.append(router.observable.subscribe(route))
         return router
 
     def create_client(self, address, options=None):
@@ -315,12 +315,8 @@ class Agent:
             options = {}
         xpub = self.bind_socket(zmq.XPUB, options, sub_address)
         xsub = self.bind_socket(zmq.XSUB, options, pub_address)
-        self.disposables.append(
-            Pipeline()(xsub.observable, subscribe=lambda x: xpub.send(x))
-        )
-        self.disposables.append(
-            Pipeline()(xpub.observable, subscribe=lambda x: xsub.send(x))
-        )
+        self.disposables.append(xsub.observable.subscribe(lambda x: xpub.send(x)))
+        self.disposables.append(xpub.observable.subscribe(lambda x: xsub.send(x)))
         return xsub, xpub
 
     def create_notification_client(
@@ -362,9 +358,20 @@ class Agent:
             await ws.close(code=WSCloseCode.GOING_AWAY, message="Server shutdown")
         self.shutdown()
 
-    ########################################################################################
-    ## websockets
-    ########################################################################################
+    #
+    # routes
+    #
+
+    def create_route(self, method, route, handler):
+
+        if not self.web_application:
+            raise Exception("Requires web_application, run create_webserver first")
+
+        self.web_application.add_routes([getattr(web, method.lower())(route, handler)])
+
+    #
+    # websockets
+    #
 
     def create_websocket(self, route):
 

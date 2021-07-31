@@ -3,7 +3,6 @@ import time
 from signal import SIGINT, SIGTERM, signal
 
 import zmq
-from rxpipes import Pipeline
 
 from agents import Agent, Message
 
@@ -36,11 +35,9 @@ class Client1(Agent):
 class Client2(Agent):
     def setup(self, name=None, address=None):
         self.client = self.create_client(address)
-
         self.disposables.append(
-            Pipeline.pipe()(
-                self.client.observable,
-                subscribe=lambda x: self.log.info(f"received: {x['payload']}"),
+            self.client.observable.subscribe(
+                lambda x: self.log.info(f"received: {x['payload']}")
             )
         )
 
