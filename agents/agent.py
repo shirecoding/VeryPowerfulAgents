@@ -12,7 +12,6 @@ import traceback
 import uuid
 from signal import SIGINT, SIGTERM, signal
 
-import rx
 import zmq
 from aiohttp import WSCloseCode, WSMsgType, web
 from pyrsistent import pmap
@@ -23,7 +22,7 @@ from zmq import auth
 from zmq.auth import CURVE_ALLOW_ANY
 from zmq.auth.thread import ThreadAuthenticator
 
-from .utils import Logger, stdout_logger
+from .utils import Logger, RxTxSubject, stdout_logger
 
 log = stdout_logger(__name__, level=logging.DEBUG)
 
@@ -378,9 +377,8 @@ class Agent:
         if not self.web_application:
             raise Exception("Requires web_application, run create_webserver first")
 
-        tx = Subject()
-        rx = Subject()
-        self.disposables += [tx, rx]
+        rtx = RxTxSubject()
+        self.disposables.append(rtx)
 
         async def websocket_handler(request):
 
@@ -399,10 +397,10 @@ class Agent:
                         )
                         ws_exit_event.set()
                     else:
-                        rx.on_next((request, msg))
+                        rtx._rx.on_next((request, msg))
 
             async def tx_loop():
-                xs = observable_to_async_iterable(tx, self.web_application["loop"])
+                xs = observable_to_async_iterable(rtx._tx, self.web_application["loop"])
                 while not any([self.exit_event.is_set(), ws_exit_event.is_set()]):
                     await ws.send_str(await xs.__anext__())
 
@@ -411,14 +409,13 @@ class Agent:
 
             finally:
                 self.web_application["websockets"].discard(ws)
-                tx.dispose()
-                rx.dispose()
+                rtx.dispose()
 
             return ws
 
         self.web_application.add_routes([web.get(route, websocket_handler)])
 
-        return rx, tx
+        return rtx
 
     ########################################################################################
     ## authentication

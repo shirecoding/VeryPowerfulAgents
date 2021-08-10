@@ -6,53 +6,29 @@ import sys
 import uuid
 from itertools import cycle
 
+from rx.subject import Subject
+
 ##############################################################################
-## Message
+## Rx
 ##############################################################################
 
 
-class Message:
+class RxTxSubject(Subject):
+    def __init__(self):
+        super().__init__()
+        self._tx = Subject()
+        self._rx = Subject()
 
-    # Message Interface
+    def on_next(self, value):
+        return self._tx.on_next(value)
 
-    NOTIFICATION = 0
-    CLIENT = 1
+    def subscribe(self, *args, **kwargs):
+        return self._rx.subscribe(*args, **kwargs)
 
-    @classmethod
-    def notification(cls, topic="", payload=""):
-        return [
-            topic.encode(),
-            bytes([cls.NOTIFICATION]),
-            json.dumps({"topic": topic, "payload": payload}).encode(),
-        ]
-
-    @classmethod
-    def client(cls, name="", payload=""):
-        return [
-            name.encode(),
-            bytes([cls.CLIENT]),
-            json.dumps({"payload": payload}).encode(),
-        ]
-
-    # Helper Methods
-
-    @classmethod
-    def decode(cls, multipart):
-        """
-        Parse zmq multipart buffer into message
-        """
-
-        v, t, payload = multipart
-        t = int.from_bytes(t, byteorder="big")
-
-        # notifications pattern
-        if t == cls.NOTIFICATION:
-            return json.loads(payload.decode())
-        # outer/client pattern
-        if t == cls.CLIENT:
-            return json.loads(payload.decode())
-        else:
-            return multipart
+    def dispose(self):
+        self._tx.dispose()
+        self._rx.dispose()
+        super().dispose()
 
 
 ##############################################################################
