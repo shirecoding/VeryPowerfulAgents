@@ -378,7 +378,6 @@ class Agent:
             raise Exception("Requires web_application, run create_webserver first")
 
         rtx = RxTxSubject()
-        self.disposables.append(rtx)
 
         async def websocket_handler(request):
 
@@ -388,6 +387,7 @@ class Agent:
             ws_exit_event = threading.Event()
             self.log.debug("creating websocket connection ...")
 
+            # ws -> rx
             async def rx_loop():
                 while not any([self.exit_event.is_set(), ws_exit_event.is_set()]):
                     msg = await ws.receive()
@@ -396,23 +396,30 @@ class Agent:
                             "ws connection closed with exception %s" % ws.exception()
                         )
                         ws_exit_event.set()
+                        break
                     else:
                         rtx._rx.on_next((request, msg))
 
+            # tx -> ws
             async def tx_loop():
                 xs = observable_to_async_iterable(rtx._tx, self.web_application["loop"])
                 while not any([self.exit_event.is_set(), ws_exit_event.is_set()]):
-                    await ws.send_str(await xs.__anext__())
+                    try:
+                        await ws.send_str(await xs.__anext__())
+                    except Exception as e:
+                        self.log.error(e)
+                        ws_exit_event.set()
+                        break
 
             try:
                 await asyncio.gather(rx_loop(), tx_loop())
 
             finally:
                 self.web_application["websockets"].discard(ws)
-                rtx.dispose()
 
             return ws
 
+        # register websocket route
         self.web_application.add_routes([web.get(route, websocket_handler)])
 
         return rtx
