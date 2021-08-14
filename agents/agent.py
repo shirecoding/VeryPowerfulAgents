@@ -10,6 +10,7 @@ import threading
 import time
 import traceback
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass
 from signal import SIGINT, SIGTERM, signal
 
@@ -19,7 +20,7 @@ from aiohttp.web import Request
 from pyrsistent import pmap
 from rx import operators as ops
 from rx.subject import Subject
-from rxpipes import observable_to_async_iterable
+from rxpipes import observable_to_async_queue
 from zmq import auth
 from zmq.auth import CURVE_ALLOW_ANY
 from zmq.auth.thread import ThreadAuthenticator
@@ -53,6 +54,11 @@ class Message:
                 raise Exception("multipart message is not of type NOTIFICATION")
             return cls(topic=topic.decode(), payload=payload.decode())
 
+        def copy(self, topic=None, payload=None):
+            return self.__class__(
+                topic=topic or self.topic, payload=payload or self.payload
+            )
+
     @dataclass
     class Client:
         name: str
@@ -72,11 +78,23 @@ class Message:
                 raise Exception("multipart message is not of type CLIENT")
             return cls(name=name.decode(), payload=payload.decode())
 
+        def copy(self, name=None, payload=None):
+            return self.__class__(
+                name=name or self.name, payload=payload or self.payload
+            )
+
     @dataclass
     class Websocket:
         connection_id: int
         request: Request
         message: WSMessage
+
+        def copy(self, connection_id=None, request=None, message=None):
+            return self.__class__(
+                connection_id=connection_id or self.connection_id,
+                request=request or self.request,
+                message=message or self.message,
+            )
 
 
 class Agent:
@@ -402,78 +420,90 @@ class Agent:
 
             # create connection
             ws = web.WebSocketResponse()
+            connection_id = id(ws)
             await ws.prepare(request)
             self.web_application["websockets"].add(ws)
-            ws_exit_event = threading.Event()
-            self.log.debug(f"creating websocket connection {id(ws)} ...")
-            connections[id(ws)] = ws
+            self.log.debug(f"Creating websocket connection {connection_id} ...")
+            connections[connection_id] = ws
 
             # clean up connections
             for x in [_id for _id, _ws in connections.items() if _ws.closed]:
-                self.log.debug(f"removing closed websocket {x} ...")
+                self.log.debug(f"Removing closed websocket {x} ...")
                 del connections[x]
 
-            # ws -> rx
-            async def rx_loop():
-                while not any([self.exit_event.is_set(), ws_exit_event.is_set()]):
-                    message = await ws.receive()
-                    if message.type == WSMsgType.ERROR:
-                        self.log(
-                            "ws connection closed with exception %s" % ws.exception()
-                        )
-                        ws_exit_event.set()
-                        break
-                    else:
-                        rtx._rx.on_next(
-                            Message.Websocket(
-                                request=request, connection_id=id(ws), message=message
-                            )
-                        )
+            async def rtx_loop():
 
-            # tx -> ws
-            async def tx_loop():
-                outgoing_messages = observable_to_async_iterable(
-                    rtx._tx, self.web_application["loop"]
+                tx_queue, tx_disposable = observable_to_async_queue(
+                    rtx._tx.pipe(
+                        ops.filter(lambda msg: msg.connection_id == connection_id)
+                    ),
+                    self.web_application["loop"],
                 )
-                while not any([self.exit_event.is_set(), ws_exit_event.is_set()]):
+
+                while not self.exit_event.is_set():
+
+                    # ws -> rx
+                    with suppress(asyncio.exceptions.TimeoutError):
+                        message = await ws.receive(timeout=0.005)
+
+                        if message.type == WSMsgType.CLOSE:
+                            self.log.debug(
+                                f"Client {connection_id} closed websocket connection"
+                            )
+                            break  # exit loop
+                        elif message.type == WSMsgType.ERROR:
+                            self.log.debug(
+                                f"Websocket connection {connection_id} closed with exception {ws.exception()}"
+                            )
+                            break  # exit loop
+                        else:
+                            rtx._rx.on_next(
+                                Message.Websocket(
+                                    request=request,
+                                    connection_id=connection_id,
+                                    message=message,
+                                )
+                            )
+
+                    # tx -> ws
                     try:
-                        msg = await outgoing_messages.__anext__()
 
-                        if msg.connection_id in connections:
-
-                            ws_socket = connections[msg.connection_id]
+                        with suppress(asyncio.queues.QueueEmpty):
+                            await asyncio.sleep(0.005)
+                            msg = tx_queue.get_nowait()
+                            tx_queue.task_done()
 
                             if msg.message.type == WSMsgType.BINARY:
-                                await ws_socket.send_bytes(msg.message.data)
+                                await asyncio.wait_for(
+                                    ws.send_bytes(msg.message.data), timeout=1
+                                )
 
                             elif msg.message.type == WSMsgType.TEXT:
-                                await ws_socket.send_str(msg.message.data)
+                                await asyncio.wait_for(
+                                    ws.send_str(msg.message.data), timeout=1
+                                )
 
                             else:
-                                raise Exception("Unsupported datatype")
-                        else:
-                            self.log.warning(
-                                f"Websocket connection {connection_id} does not exist"
-                            )
+                                self.log.warning(f"Unsupported datatype: {msg}")
 
                     except Exception as e:
-                        self.log.error(e)
-                        ws_exit_event.set()
-                        break
+                        self.log.error(f"{str(e)}\n\n{traceback.format_exc()}")
+                        break  # exit loop
 
-            try:
-                await asyncio.gather(rx_loop(), tx_loop())
+            # process
+            await rtx_loop()
 
-            finally:
-                self.web_application["websockets"].discard(ws)
-                del connections[id(ws)]
+            # cleanup
+            self.web_application["websockets"].discard(ws)
+            del connections[connection_id]
+            self.log.debug(f"Websocket connection {id(ws)} closed")
 
             return ws
 
         # register websocket route
         self.web_application.add_routes([web.get(route, websocket_handler)])
 
-        return rtx
+        return rtx, connections
 
     ########################################################################################
     ## authentication
