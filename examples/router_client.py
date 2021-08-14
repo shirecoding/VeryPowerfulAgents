@@ -27,9 +27,9 @@ class Client1(Agent):
         while not self.exit_event.is_set():
             time.sleep(1)
             self.counter += 1
-            target = "client2"
-            self.log.info(f"send to {target}: {self.counter}")
-            self.client.send(Message.client(name=target, payload=self.counter))
+            msg = Message.Client(name="client2", payload=str(self.counter))
+            self.log.info(f"send: {msg}")
+            self.client.send(msg.to_multipart())
 
 
 class Client2(Agent):
@@ -37,7 +37,7 @@ class Client2(Agent):
         self.client = self.create_client(address)
         self.disposables.append(
             self.client.observable.subscribe(
-                lambda x: self.log.info(f"received: {x['payload']}")
+                lambda msg: self.log.info(f"received: {msg}")
             )
         )
 

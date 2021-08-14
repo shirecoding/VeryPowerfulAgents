@@ -62,8 +62,9 @@ class Sender(Agent):
         while not self.exit_event.is_set():
             time.sleep(1)
             self.counter += 1
-            self.log.info(f"publishing: {self.counter}")
-            self.pub.send(Message.notification(payload=self.counter))
+            msg = Message.Notification(payload=str(self.counter))
+            self.log.info(f"publishing: {msg}")
+            self.pub.send(msg.to_multipart())
 
 
 class Listener(Agent):
@@ -86,9 +87,7 @@ class Listener(Agent):
         self.pub, self.sub = self.create_notification_client(
             pub_address, sub_address, options=options
         )
-        self.sub.observable.subscribe(
-            lambda x: self.log.info(f"received: { x['payload'] }")
-        )
+        self.sub.observable.subscribe(lambda x: self.log.info(f"received: {x}"))
 
 
 if __name__ == "__main__":

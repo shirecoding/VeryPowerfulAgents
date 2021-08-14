@@ -29,9 +29,9 @@ class Client1(Agent):
 
     def send_message(self, x):
         self.counter += 1
-        target = "client2"
-        self.log.info(f"send to {target}: {self.counter}")
-        self.client.send(Message.client(name=target, payload=self.counter))
+        msg = Message.Client(name="client2", payload=str(self.counter))
+        self.log.info(f"send: {msg}")
+        self.client.send(msg.to_multipart())
 
 
 class Client2(Agent):
@@ -42,7 +42,7 @@ class Client2(Agent):
     async def task(self, loop):
         obs = Pipeline.take(5).to_observable(self.client.observable)
         async for x in observable_to_async_iterable(obs, loop):
-            self.log.info(f"received: {x['payload']}")
+            self.log.info(f"received: {x}")
 
         self.log.info("done ...")
 

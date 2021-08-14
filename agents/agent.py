@@ -10,10 +10,12 @@ import threading
 import time
 import traceback
 import uuid
+from dataclasses import dataclass
 from signal import SIGINT, SIGTERM, signal
 
 import zmq
-from aiohttp import WSCloseCode, WSMsgType, web
+from aiohttp import WSCloseCode, WSMessage, WSMsgType, web
+from aiohttp.web import Request
 from pyrsistent import pmap
 from rx import operators as ops
 from rx.subject import Subject
@@ -32,41 +34,49 @@ class Message:
     NOTIFICATION = 0
     CLIENT = 1
 
-    @classmethod
-    def notification(cls, topic="", payload=""):
-        return [
-            topic.encode(),
-            bytes([cls.NOTIFICATION]),
-            json.dumps({"topic": topic, "payload": payload}).encode(),
-        ]
+    @dataclass
+    class Notification:
+        payload: str
+        topic: str = ""
 
-    @classmethod
-    def client(cls, name="", payload=""):
-        return [
-            name.encode(),
-            bytes([cls.CLIENT]),
-            json.dumps({"payload": payload}).encode(),
-        ]
+        def to_multipart(self):
+            return [
+                self.topic.encode(),
+                bytes([Message.NOTIFICATION]),
+                self.payload.encode(),
+            ]
 
-    # Helper Methods
+        @classmethod
+        def from_multipart(cls, xs):
+            topic, t, payload = xs
+            if int.from_bytes(t, byteorder="big") != Message.NOTIFICATION:
+                raise Exception("multipart message is not of type NOTIFICATION")
+            return cls(topic=topic.decode(), payload=payload.decode())
 
-    @classmethod
-    def decode(cls, multipart):
-        """
-        Parse zmq multipart buffer into message
-        """
+    @dataclass
+    class Client:
+        name: str
+        payload: str
 
-        v, t, payload = multipart
-        t = int.from_bytes(t, byteorder="big")
+        def to_multipart(self):
+            return [
+                self.name.encode(),
+                bytes([Message.CLIENT]),
+                self.payload.encode(),
+            ]
 
-        # notifications pattern
-        if t == cls.NOTIFICATION:
-            return json.loads(payload.decode())
-        # router/client pattern
-        if t == cls.CLIENT:
-            return json.loads(payload.decode())
-        else:
-            return multipart
+        @classmethod
+        def from_multipart(cls, xs):
+            name, t, payload = xs
+            if int.from_bytes(t, byteorder="big") != Message.CLIENT:
+                raise Exception("multipart message is not of type CLIENT")
+            return cls(name=name.decode(), payload=payload.decode())
+
+    @dataclass
+    class Websocket:
+        connection_id: int
+        request: Request
+        message: WSMessage
 
 
 class Agent:
@@ -293,7 +303,11 @@ class Agent:
             options[zmq.IDENTITY] = self.name.encode("utf-8")
         dealer = self.connect_socket(zmq.DEALER, options, address)
         return dealer.update(
-            {"observable": dealer.observable.pipe(ops.map(Message.decode))}
+            {
+                "observable": dealer.observable.pipe(
+                    ops.map(Message.Client.from_multipart)
+                )
+            }
         )
 
     ########################################################################################
@@ -336,7 +350,11 @@ class Agent:
         sub = self.connect_socket(zmq.SUB, options, sub_address)
         sub.socket.subscribe(topics)
         return pub, sub.update(
-            {"observable": sub.observable.pipe(ops.map(Message.decode))}
+            {
+                "observable": sub.observable.pipe(
+                    ops.map(Message.Notification.from_multipart)
+                )
+            }
         )
 
     ########################################################################################
@@ -352,7 +370,7 @@ class Agent:
         return self.web_application
 
     async def webserver_shutdown(self, *args, **kwargs):
-        self.log.debug("closing websockets ...")
+        self.log.debug("closing remaining websockets ...")
         for ws in self.web_application["websockets"]:
             await ws.close(code=WSCloseCode.GOING_AWAY, message="Server shutdown")
         self.shutdown()
@@ -378,34 +396,66 @@ class Agent:
             raise Exception("Requires web_application, run create_webserver first")
 
         rtx = RxTxSubject()
+        connections = {}
 
         async def websocket_handler(request):
 
+            # create connection
             ws = web.WebSocketResponse()
             await ws.prepare(request)
             self.web_application["websockets"].add(ws)
             ws_exit_event = threading.Event()
-            self.log.debug("creating websocket connection ...")
+            self.log.debug(f"creating websocket connection {id(ws)} ...")
+            connections[id(ws)] = ws
+
+            # clean up connections
+            for x in [_id for _id, _ws in connections.items() if _ws.closed]:
+                self.log.debug(f"removing closed websocket {x} ...")
+                del connections[x]
 
             # ws -> rx
             async def rx_loop():
                 while not any([self.exit_event.is_set(), ws_exit_event.is_set()]):
-                    msg = await ws.receive()
-                    if msg.type == WSMsgType.ERROR:
+                    message = await ws.receive()
+                    if message.type == WSMsgType.ERROR:
                         self.log(
                             "ws connection closed with exception %s" % ws.exception()
                         )
                         ws_exit_event.set()
                         break
                     else:
-                        rtx._rx.on_next((request, msg))
+                        rtx._rx.on_next(
+                            Message.Websocket(
+                                request=request, connection_id=id(ws), message=message
+                            )
+                        )
 
             # tx -> ws
             async def tx_loop():
-                xs = observable_to_async_iterable(rtx._tx, self.web_application["loop"])
+                outgoing_messages = observable_to_async_iterable(
+                    rtx._tx, self.web_application["loop"]
+                )
                 while not any([self.exit_event.is_set(), ws_exit_event.is_set()]):
                     try:
-                        await ws.send_str(await xs.__anext__())
+                        msg = await outgoing_messages.__anext__()
+
+                        if msg.connection_id in connections:
+
+                            ws_socket = connections[msg.connection_id]
+
+                            if msg.message.type == WSMsgType.BINARY:
+                                await ws_socket.send_bytes(msg.message.data)
+
+                            elif msg.message.type == WSMsgType.TEXT:
+                                await ws_socket.send_str(msg.message.data)
+
+                            else:
+                                raise Exception("Unsupported datatype")
+                        else:
+                            self.log.warning(
+                                f"Websocket connection {connection_id} does not exist"
+                            )
+
                     except Exception as e:
                         self.log.error(e)
                         ws_exit_event.set()
@@ -416,6 +466,7 @@ class Agent:
 
             finally:
                 self.web_application["websockets"].discard(ws)
+                del connections[id(ws)]
 
             return ws
 
