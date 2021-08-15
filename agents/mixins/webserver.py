@@ -1,4 +1,5 @@
 import asyncio
+import threading
 import traceback
 from contextlib import suppress
 
@@ -11,6 +12,39 @@ from agents.utils import RxTxSubject
 
 
 class WebserverMixin:
+
+    web_application = None
+
+    def setup(self, *args, **kwargs):
+        # start webserver
+        if self.web_application:
+            self.log.info("Starting webserver ...")
+
+            async def _until_exit():
+                while not self.exit_event.is_set():
+                    await asyncio.sleep(1)
+
+            def _run_server_thread():
+                try:
+                    loop = asyncio.new_event_loop()
+                    runner = web.AppRunner(self.web_application)
+                    asyncio.set_event_loop(loop)
+                    self.web_application["loop"] = loop
+                    loop.run_until_complete(runner.setup())
+                    site = web.TCPSite(
+                        runner,
+                        self.web_application["host"],
+                        self.web_application["port"],
+                    )
+                    loop.run_until_complete(site.start())
+                    loop.run_until_complete(_until_exit())
+                finally:
+                    loop.close()
+
+            t = threading.Thread(target=_run_server_thread)
+            self.threads.append(t)
+            t.start()
+
     def create_webserver(self, host, port):
         self.web_application = web.Application()
         self.web_application["host"] = host

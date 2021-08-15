@@ -1,5 +1,11 @@
 repos:
 
+- repo: https://github.com/myint/autoflake
+  rev: v1.4
+  hooks:
+  - id: autoflake
+    args: ["-ri", "--remove-all-unused-imports", "--ignore-init-module-imports"]
+
 - repo: https://github.com/ambv/black
   rev: stable
   hooks:

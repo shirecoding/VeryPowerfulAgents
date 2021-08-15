@@ -5,6 +5,14 @@ from zmq.auth.thread import ThreadAuthenticator
 
 
 class AuthenticationMixin:
+
+    zap = None
+
+    def shutdown(self):
+        if self.zap:
+            self.log.info("Stopping ZMQ Authenticator ...")
+            self.zap.stop()
+
     def curve_server_config(self, server_private_key):
         return {zmq.CURVE_SERVER: 1, zmq.CURVE_SECRETKEY: server_private_key}
 

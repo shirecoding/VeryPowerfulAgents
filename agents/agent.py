@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 import queue
@@ -9,11 +8,9 @@ import uuid
 from signal import SIGINT, SIGTERM, signal
 
 import zmq
-from aiohttp import web
 from pyrsistent import pmap
 from rx.subject import Subject
 
-from .message import Message
 from .mixins import (
     AuthenticationMixin,
     NotificationsMixin,
@@ -27,13 +24,7 @@ log = stdout_logger(__name__, level=logging.DEBUG)
 
 class Agent(RouterClientMixin, NotificationsMixin, AuthenticationMixin, WebserverMixin):
     def __init__(self, *args, name=None, **kwargs):
-
-        # extract special kwargs
-        if name:
-            self.name = name
-        else:
-            self.name = uuid.uuid4().hex
-
+        self.name = name or uuid.uuid4().hex
         self.log = Logger(log, {"agent": self.name})
         self.initialized_event = threading.Event()
         self.exit_event = threading.Event()
@@ -41,8 +32,6 @@ class Agent(RouterClientMixin, NotificationsMixin, AuthenticationMixin, Webserve
         self.zmq_poller = zmq.Poller()
         self.threads = []
         self.disposables = []
-        self.zap = None
-        self.web_application = None
 
         # signals for graceful shutdown
         signal(SIGTERM, self._shutdown)
@@ -70,41 +59,18 @@ class Agent(RouterClientMixin, NotificationsMixin, AuthenticationMixin, Webserve
     def boot(self, *args, **kwargs):
         try:
             start = time.time()
-            self.log.info("booting up ...")
+            self.log.info("Booting up ...")
             self.zmq_context = zmq.Context()
 
             # user setup
-            self.log.info("running user setup ...")
+            self.log.info("Running user setup ...")
             self.setup(*args, **kwargs)
 
-            # start webserver
-            if self.web_application:
-                self.log.info("starting webserver ...")
-
-                async def _until_exit():
-                    while not self.exit_event.is_set():
-                        await asyncio.sleep(1)
-
-                def _run_server_thread():
-                    try:
-                        loop = asyncio.new_event_loop()
-                        runner = web.AppRunner(self.web_application)
-                        asyncio.set_event_loop(loop)
-                        self.web_application["loop"] = loop
-                        loop.run_until_complete(runner.setup())
-                        site = web.TCPSite(
-                            runner,
-                            self.web_application["host"],
-                            self.web_application["port"],
-                        )
-                        loop.run_until_complete(site.start())
-                        loop.run_until_complete(_until_exit())
-                    finally:
-                        loop.close()
-
-                t = threading.Thread(target=_run_server_thread)
-                self.threads.append(t)
-                t.start()
+            # setup bases
+            for base in Agent.__bases__:
+                if hasattr(base, "setup"):
+                    self.log.info(f"Initiating {base.__name__} setup procedure")
+                    base.setup(self, *args, **kwargs)
 
             # process sockets
             t = threading.Thread(target=self.process_sockets)
@@ -112,10 +78,10 @@ class Agent(RouterClientMixin, NotificationsMixin, AuthenticationMixin, Webserve
             t.start()
 
             self.initialized_event.set()
-            self.log.info(f"booted in {time.time() - start} seconds ...")
+            self.log.info(f"Booted in {time.time() - start} seconds ...")
 
         except Exception as e:
-            self.log.error(f"failed to boot ...\n\n{traceback.format_exc()}")
+            self.log.error(f"Failed to boot ...\n\n{traceback.format_exc()}")
             self.initialized_event.set()
             os.kill(os.getpid(), SIGINT)
 
@@ -124,10 +90,11 @@ class Agent(RouterClientMixin, NotificationsMixin, AuthenticationMixin, Webserve
         Shutdown procedure, call super().shutdown() if overriding
         """
 
-        # stop authenticator
-        if self.zap:
-            self.log.info("stopping ZMQ Authenticator ...")
-            self.zap.stop()
+        # run shutdown procedures of all bases
+        for base in Agent.__bases__:
+            if hasattr(base, "shutdown"):
+                self.log.info(f"Initiating {base.__name__} shutdown procedure")
+                base.shutdown(self)
 
         # dispose observables
         for d in self.disposables:
