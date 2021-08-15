@@ -1,29 +1,17 @@
-__all__ = ["Message", "Agent"]
-
 import asyncio
-import json
 import logging
 import os
 import queue
-import sys
 import threading
 import time
 import traceback
 import uuid
-from contextlib import suppress
-from dataclasses import dataclass
 from signal import SIGINT, SIGTERM, signal
 
 import zmq
-from aiohttp import WSCloseCode, WSMessage, WSMsgType, web
-from aiohttp.web import Request
+from aiohttp import web
 from pyrsistent import pmap
-from rx import operators as ops
 from rx.subject import Subject
-from rxpipes import observable_to_async_queue
-from zmq import auth
-from zmq.auth import CURVE_ALLOW_ANY
-from zmq.auth.thread import ThreadAuthenticator
 
 from .message import Message
 from .mixins import (
@@ -32,7 +20,7 @@ from .mixins import (
     RouterClientMixin,
     WebserverMixin,
 )
-from .utils import Logger, RxTxSubject, stdout_logger
+from .utils import Logger, stdout_logger
 
 log = stdout_logger(__name__, level=logging.DEBUG)
 
@@ -73,13 +61,11 @@ class Agent(RouterClientMixin, NotificationsMixin, AuthenticationMixin, Webserve
         """
         User override
         """
-        pass
 
     def initialized(self):
         """
         User override
         """
-        pass
 
     def boot(self, *args, **kwargs):
         try:

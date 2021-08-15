@@ -2,7 +2,6 @@ import asyncio
 import traceback
 from contextlib import suppress
 
-import zmq
 from aiohttp import WSCloseCode, WSMsgType, web
 from rx import operators as ops
 from rxpipes import observable_to_async_queue

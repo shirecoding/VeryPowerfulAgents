@@ -2,8 +2,6 @@ import threading
 import time
 from signal import SIGINT, SIGTERM, signal
 
-import zmq
-
 from agents import Agent, Message
 
 # generate public and private keys for server and client
