@@ -25,79 +25,19 @@ from zmq import auth
 from zmq.auth import CURVE_ALLOW_ANY
 from zmq.auth.thread import ThreadAuthenticator
 
+from .message import Message
+from .mixins import (
+    AuthenticationMixin,
+    NotificationsMixin,
+    RouterClientMixin,
+    WebserverMixin,
+)
 from .utils import Logger, RxTxSubject, stdout_logger
 
 log = stdout_logger(__name__, level=logging.DEBUG)
 
 
-class Message:
-
-    NOTIFICATION = 0
-    CLIENT = 1
-
-    @dataclass
-    class Notification:
-        payload: str
-        topic: str = ""
-
-        def to_multipart(self):
-            return [
-                self.topic.encode(),
-                bytes([Message.NOTIFICATION]),
-                self.payload.encode(),
-            ]
-
-        @classmethod
-        def from_multipart(cls, xs):
-            topic, t, payload = xs
-            if int.from_bytes(t, byteorder="big") != Message.NOTIFICATION:
-                raise Exception("multipart message is not of type NOTIFICATION")
-            return cls(topic=topic.decode(), payload=payload.decode())
-
-        def copy(self, topic=None, payload=None):
-            return self.__class__(
-                topic=topic or self.topic, payload=payload or self.payload
-            )
-
-    @dataclass
-    class Client:
-        name: str
-        payload: str
-
-        def to_multipart(self):
-            return [
-                self.name.encode(),
-                bytes([Message.CLIENT]),
-                self.payload.encode(),
-            ]
-
-        @classmethod
-        def from_multipart(cls, xs):
-            name, t, payload = xs
-            if int.from_bytes(t, byteorder="big") != Message.CLIENT:
-                raise Exception("multipart message is not of type CLIENT")
-            return cls(name=name.decode(), payload=payload.decode())
-
-        def copy(self, name=None, payload=None):
-            return self.__class__(
-                name=name or self.name, payload=payload or self.payload
-            )
-
-    @dataclass
-    class Websocket:
-        connection_id: int
-        request: Request
-        message: WSMessage
-
-        def copy(self, connection_id=None, request=None, message=None):
-            return self.__class__(
-                connection_id=connection_id or self.connection_id,
-                request=request or self.request,
-                message=message or self.message,
-            )
-
-
-class Agent:
+class Agent(RouterClientMixin, NotificationsMixin, AuthenticationMixin, WebserverMixin):
     def __init__(self, *args, name=None, **kwargs):
 
         # extract special kwargs
@@ -128,6 +68,18 @@ class Agent:
 
         # call initialized hook
         self.initialized()
+
+    def setup(self):
+        """
+        User override
+        """
+        pass
+
+    def initialized(self):
+        """
+        User override
+        """
+        pass
 
     def boot(self, *args, **kwargs):
         try:
@@ -297,276 +249,3 @@ class Agent:
                             pass
             else:
                 time.sleep(1)
-
-    ########################################################################################
-    ## router/client pattern
-    ########################################################################################
-
-    def create_router(self, address, options=None):
-        if options is None:
-            options = {}
-        router = self.bind_socket(zmq.ROUTER, options, address)
-
-        def route(x):
-            source, dest = x[0:2]
-            router.send([dest, source] + x[2:])
-
-        self.disposables.append(router.observable.subscribe(route))
-        return router
-
-    def create_client(self, address, options=None):
-        if options is None:
-            options = {}
-        if zmq.IDENTITY not in options:
-            options[zmq.IDENTITY] = self.name.encode("utf-8")
-        dealer = self.connect_socket(zmq.DEALER, options, address)
-        return dealer.update(
-            {
-                "observable": dealer.observable.pipe(
-                    ops.map(Message.Client.from_multipart)
-                )
-            }
-        )
-
-    ########################################################################################
-    ## notifications pattern
-    ########################################################################################
-
-    def create_notification_broker(self, pub_address, sub_address, options=None):
-        """Starts a pub-sub notifications broker
-
-        Args:
-            pub_address (str): agents publish to this address to notify other agents
-            sub_address (str): agents listen on this address for notifications
-
-        Returns:
-            connections (pub, sub)
-        """
-        if options is None:
-            options = {}
-        xpub = self.bind_socket(zmq.XPUB, options, sub_address)
-        xsub = self.bind_socket(zmq.XSUB, options, pub_address)
-        self.disposables.append(xsub.observable.subscribe(lambda x: xpub.send(x)))
-        self.disposables.append(xpub.observable.subscribe(lambda x: xsub.send(x)))
-        return xsub, xpub
-
-    def create_notification_client(
-        self, pub_address, sub_address, options=None, topics=""
-    ):
-        """Creates 2 connections (pub, sub) to a notifications broker
-
-        Args:
-            pub_address (str): publish to this address to notify other agents
-            sub_address (str): listen on this address for notifications
-
-        Returns:
-            connections (pub, sub)
-        """
-        if options is None:
-            options = {}
-        pub = self.connect_socket(zmq.PUB, options, pub_address)
-        sub = self.connect_socket(zmq.SUB, options, sub_address)
-        sub.socket.subscribe(topics)
-        return pub, sub.update(
-            {
-                "observable": sub.observable.pipe(
-                    ops.map(Message.Notification.from_multipart)
-                )
-            }
-        )
-
-    ########################################################################################
-    ## webserver
-    ########################################################################################
-
-    def create_webserver(self, host, port):
-        self.web_application = web.Application()
-        self.web_application["host"] = host
-        self.web_application["port"] = port
-        self.web_application["websockets"] = set()
-        self.web_application.on_shutdown.append(self.webserver_shutdown)
-        return self.web_application
-
-    async def webserver_shutdown(self, *args, **kwargs):
-        self.log.debug("closing remaining websockets ...")
-        for ws in self.web_application["websockets"]:
-            await ws.close(code=WSCloseCode.GOING_AWAY, message="Server shutdown")
-        self.shutdown()
-
-    #
-    # routes
-    #
-
-    def create_route(self, method, route, handler):
-
-        if not self.web_application:
-            raise Exception("Requires web_application, run create_webserver first")
-
-        self.web_application.add_routes([getattr(web, method.lower())(route, handler)])
-
-    #
-    # websockets
-    #
-
-    def create_websocket(self, route):
-
-        if not self.web_application:
-            raise Exception("Requires web_application, run create_webserver first")
-
-        rtx = RxTxSubject()
-        connections = {}
-
-        async def websocket_handler(request):
-
-            # create connection
-            ws = web.WebSocketResponse()
-            connection_id = id(ws)
-            await ws.prepare(request)
-            self.web_application["websockets"].add(ws)
-            self.log.debug(f"Creating websocket connection {connection_id} ...")
-            connections[connection_id] = ws
-
-            # clean up connections
-            for x in [_id for _id, _ws in connections.items() if _ws.closed]:
-                self.log.debug(f"Removing closed websocket {x} ...")
-                del connections[x]
-
-            async def rtx_loop():
-
-                tx_queue, tx_disposable = observable_to_async_queue(
-                    rtx._tx.pipe(
-                        ops.filter(lambda msg: msg.connection_id == connection_id)
-                    ),
-                    self.web_application["loop"],
-                )
-
-                while not self.exit_event.is_set():
-
-                    # ws -> rx
-                    with suppress(asyncio.exceptions.TimeoutError):
-                        message = await ws.receive(timeout=0.005)
-
-                        if message.type == WSMsgType.CLOSE:
-                            self.log.debug(
-                                f"Client {connection_id} closed websocket connection"
-                            )
-                            break  # exit loop
-                        elif message.type == WSMsgType.ERROR:
-                            self.log.debug(
-                                f"Websocket connection {connection_id} closed with exception {ws.exception()}"
-                            )
-                            break  # exit loop
-                        else:
-                            rtx._rx.on_next(
-                                Message.Websocket(
-                                    request=request,
-                                    connection_id=connection_id,
-                                    message=message,
-                                )
-                            )
-
-                    # tx -> ws
-                    try:
-
-                        with suppress(asyncio.queues.QueueEmpty):
-                            await asyncio.sleep(0.005)
-                            msg = tx_queue.get_nowait()
-                            tx_queue.task_done()
-
-                            if msg.message.type == WSMsgType.BINARY:
-                                await asyncio.wait_for(
-                                    ws.send_bytes(msg.message.data), timeout=1
-                                )
-
-                            elif msg.message.type == WSMsgType.TEXT:
-                                await asyncio.wait_for(
-                                    ws.send_str(msg.message.data), timeout=1
-                                )
-
-                            else:
-                                self.log.warning(f"Unsupported datatype: {msg}")
-
-                    except Exception as e:
-                        self.log.error(f"{str(e)}\n\n{traceback.format_exc()}")
-                        break  # exit loop
-
-            # process
-            await rtx_loop()
-
-            # cleanup
-            self.web_application["websockets"].discard(ws)
-            del connections[connection_id]
-            self.log.debug(f"Websocket connection {id(ws)} closed")
-
-            return ws
-
-        # register websocket route
-        self.web_application.add_routes([web.get(route, websocket_handler)])
-
-        return rtx, connections
-
-    ########################################################################################
-    ## authentication
-    ########################################################################################
-
-    def curve_server_config(self, server_private_key):
-        return {zmq.CURVE_SERVER: 1, zmq.CURVE_SECRETKEY: server_private_key}
-
-    def curve_client_config(
-        self, server_public_key, client_public_key, client_private_key
-    ):
-        return {
-            zmq.CURVE_SERVERKEY: server_public_key,
-            zmq.CURVE_PUBLICKEY: client_public_key,
-            zmq.CURVE_SECRETKEY: client_private_key,
-        }
-
-    @classmethod
-    def curve_keypair(cls):
-        return zmq.curve_keypair()
-
-    @classmethod
-    def create_curve_certificates(cls, path, name, metadata=None):
-        return auth.create_certificates(path, name, metadata=metadata)
-
-    @classmethod
-    def load_curve_certificate(cls, path):
-        return auth.load_certificate(path)
-
-    @classmethod
-    def load_curve_certificates(cls, path):
-        return auth.load_certificates(path)
-
-    def start_authenticator(
-        self, domain="*", whitelist=None, blacklist=None, certificates_path=None
-    ):
-        """Starts ZAP Authenticator in thread
-
-        configure_curve must be called every time certificates are added or removed, in order to update the Authenticator’s state
-
-        Args:
-            certificates_path (str): path to client public keys to allow
-            whitelist (list[str]): ip addresses to whitelist
-            domain: (str): domain to apply authentication
-        """
-        certificates_path = certificates_path if certificates_path else CURVE_ALLOW_ANY
-        self.zap = ThreadAuthenticator(self.zmq_context, log=self.log)
-        self.zap.start()
-        if whitelist is not None:
-            self.zap.allow(*whitelist)
-        elif blacklist is not None:
-            self.zap.deny(*blacklist)
-        else:
-            self.zap.allow()
-        self.zap.configure_curve(domain=domain, location=certificates_path)
-        return self.zap
-
-    ########################################################################################
-    ## override
-    ########################################################################################
-
-    def setup(self):
-        pass
-
-    def initialized(self):
-        pass

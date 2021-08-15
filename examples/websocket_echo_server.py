@@ -47,10 +47,8 @@ class WebServer(Agent):
         self.route = route
         self.create_webserver(host, port)
         self.create_route("GET", "/", self.echo)
-        self.rtx = self.create_websocket(route)
-        self.disposables.append(
-            self.rtx.subscribe(lambda xs: self.rtx.on_next(xs[1].data))
-        )
+        self.rtx, self.connections = self.create_websocket(route)
+        self.disposables.append(self.rtx.subscribe(lambda msg: self.rtx.on_next(msg)))
 
     async def echo(self, request):
         return web.Response(
