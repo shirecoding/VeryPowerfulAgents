@@ -83,11 +83,7 @@ class WebserverMixin:
             self.web_application["websockets"].add(ws)
             self.log.debug(f"Creating websocket connection {connection_id} ...")
             connections[connection_id] = ws
-
-            # clean up connections
-            for x in [_id for _id, _ws in connections.items() if _ws.closed]:
-                self.log.debug(f"Removing closed websocket {x} ...")
-                del connections[x]
+            close_reason = (WSCloseCode.OK, "Closed OK")
 
             async def rtx_loop():
 
@@ -110,9 +106,9 @@ class WebserverMixin:
                             )
                             break  # exit loop
                         elif message.type == WSMsgType.ERROR:
-                            self.log.debug(
-                                f"Websocket connection {connection_id} closed with exception {ws.exception()}"
-                            )
+                            err = f"Websocket connection {connection_id} closed with exception {ws.exception()}"
+                            self.log.debug(err)
+                            close_reason = (WSCloseCode.PROTOCOL_ERROR, err)
                             break  # exit loop
                         else:
                             rtx._rx.on_next(
@@ -132,29 +128,33 @@ class WebserverMixin:
                             tx_queue.task_done()
 
                             if msg.message.type == WSMsgType.BINARY:
-                                await asyncio.wait_for(
-                                    ws.send_bytes(msg.message.data), timeout=1
-                                )
+                                await ws.send_bytes(msg.message.data)
 
                             elif msg.message.type == WSMsgType.TEXT:
-                                await asyncio.wait_for(
-                                    ws.send_str(msg.message.data), timeout=1
-                                )
+                                await ws.send_str(msg.message.data)
 
                             else:
-                                self.log.warning(f"Unsupported datatype: {msg}")
+                                raise Exception(f"Unsupported datatype: {msg}")
 
                     except Exception as e:
-                        self.log.error(f"{str(e)}\n\n{traceback.format_exc()}")
+                        err = f"{str(e)}\n\n{traceback.format_exc()}"
+                        close_reason = (WSCloseCode.UNSUPPORTED_DATA, err)
+                        self.log.error(err)
                         break  # exit loop
 
             # process
             await rtx_loop()
 
             # cleanup
+            await ws.close(code=close_reason[0], message=close_reason[1])
             self.web_application["websockets"].discard(ws)
             del connections[connection_id]
             self.log.debug(f"Websocket connection {id(ws)} closed")
+
+            # clean up connections
+            for x in [_id for _id, _ws in connections.items() if _ws.closed]:
+                self.log.debug(f"Removing closed websocket {x} ...")
+                del connections[x]
 
             return ws
 
