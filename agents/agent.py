@@ -13,6 +13,7 @@ from rx.subject import Subject
 
 from .mixins import (
     AuthenticationMixin,
+    DaemonMixin,
     NotificationsMixin,
     RouterClientMixin,
     WebserverMixin,
@@ -22,7 +23,13 @@ from .utils import Logger, stdout_logger
 log = stdout_logger(__name__, level=logging.DEBUG)
 
 
-class Agent(RouterClientMixin, NotificationsMixin, AuthenticationMixin, WebserverMixin):
+class Agent(
+    RouterClientMixin,
+    NotificationsMixin,
+    AuthenticationMixin,
+    WebserverMixin,
+    DaemonMixin,
+):
     def __init__(self, *args, name=None, **kwargs):
         self.name = name or uuid.uuid4().hex
         self.log = Logger(log, {"agent": self.name})
