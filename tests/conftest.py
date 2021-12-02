@@ -21,10 +21,10 @@ def pytest_html_results_table_header(cells):
 
 # @pytest.mark.optionalhook
 def pytest_html_results_table_row(report, cells):
-    cells.insert(1, stringToCellData(report.specification, class_="col-spec"))
-    cells.insert(2, stringToCellData(report.description, class_="col-desc"))
-    cells.insert(3, stringToCellData(report.procedure, class_="col-proc"))
-    cells.insert(4, stringToCellData(report.expected, class_="col-expec"))
+    cells.insert(1, stringToCellData(getattr(report, 'specification', ''), class_="col-spec"))
+    cells.insert(2, stringToCellData(getattr(report, 'description', ''), class_="col-desc"))
+    cells.insert(3, stringToCellData(getattr(report, 'procedure', ''), class_="col-proc"))
+    cells.insert(4, stringToCellData(getattr(report, 'expected', ''), class_="col-expec"))
     cells.pop()  # remove links column
 
 
