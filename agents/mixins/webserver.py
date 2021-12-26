@@ -77,8 +77,9 @@ class WebserverMixin:
         async def websocket_handler(request):
 
             # authenticate
-            if authenticate and not authenticate(request):
-                raise web.HTTPUnauthorized()
+            if authenticate:
+                if authenticate(request) != True:
+                    raise web.HTTPUnauthorized()
 
             # create connection
             ws = web.WebSocketResponse()
