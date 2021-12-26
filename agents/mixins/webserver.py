@@ -66,7 +66,7 @@ class WebserverMixin:
 
         self.web_application.add_routes([getattr(web, method.lower())(route, handler)])
 
-    def create_websocket(self, route):
+    def create_websocket(self, route, authenticate=None):
 
         if not self.web_application:
             raise Exception("Requires web_application, run create_webserver first")
@@ -75,6 +75,10 @@ class WebserverMixin:
         connections = {}
 
         async def websocket_handler(request):
+
+            # authenticate
+            if authenticate and not authenticate(request):
+                raise web.HTTPUnauthorized()
 
             # create connection
             ws = web.WebSocketResponse()
