@@ -115,7 +115,7 @@ class Agent(
         self.initialized_event.wait()
 
         # join threads
-        self.log.info("joining threads ...")
+        self.log.debug(f"joining {len(self.threads)} threads ...")
         for t in self.threads:
             self.log.info(f"joining {t}")
             t.join()
@@ -126,6 +126,8 @@ class Agent(
             self.log.info(f"closing socket {k} ...")
             v["socket"].close()
         self.zmq_context.term()
+
+        self.log.info("shutdown complete ...")
 
     def _shutdown(self, signum, frame):
         self.shutdown()

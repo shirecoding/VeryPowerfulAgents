@@ -31,6 +31,7 @@ def start_agents():
     """,
 )
 def test_agent_with_daemon(start_agents):
+    
     def handle_queue(numbers, operation="add"):
         if operation == "multiple":
             return math.prod(numbers)
