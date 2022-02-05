@@ -6,7 +6,7 @@ from typing import Optional
 from aiohttp import WSCloseCode, WSMessage, WSMsgType
 from aiohttp.web import WebSocketResponse
 
-from agents.messaging import BaseConnection
+from agents.messaging.defs import BaseConnection
 
 
 @dataclass

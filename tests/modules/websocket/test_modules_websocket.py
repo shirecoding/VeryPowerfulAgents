@@ -5,7 +5,8 @@ import pytest
 from aiohttp.web import Response
 
 from agents import Agent
-from agents.messaging import ConnectionPool, JSONMessage
+from agents.messaging.messages import JSONMessage
+from agents.messaging.pool import ConnectionPool
 from agents.modules.websocket import WebSocketModule
 from agents.utils import RxTxSubject
 

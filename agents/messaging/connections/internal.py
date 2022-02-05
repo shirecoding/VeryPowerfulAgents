@@ -4,7 +4,7 @@ from collections import defaultdict
 from queue import Queue
 from typing import Optional
 
-from agents.messaging import BaseConnection
+from agents.messaging.defs import BaseConnection
 
 _pidgeon_holes = defaultdict(Queue)
 

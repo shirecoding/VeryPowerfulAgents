@@ -2,7 +2,8 @@ import logging
 
 import pytest
 
-from agents.messaging import InternalConnection, JSONMessage, WebsocketConnection
+from agents.messaging.connections import InternalConnection, WebsocketConnection
+from agents.messaging.messages import JSONMessage
 
 log = logging.getLogger(__name__)
 

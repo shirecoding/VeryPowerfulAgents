@@ -2,7 +2,9 @@ import logging
 
 import pytest
 
-from agents.messaging import ConnectionPool, InternalConnection, JSONMessage
+from agents.messaging.connections import InternalConnection
+from agents.messaging.messages import JSONMessage
+from agents.messaging.pool import ConnectionPool
 
 log = logging.getLogger(__name__)
 

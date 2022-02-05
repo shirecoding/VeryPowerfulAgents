@@ -8,7 +8,9 @@ from aiohttp import web
 from rx import operators as ops
 from rxpipes import observable_to_async_queue
 
-from agents.messaging import BaseMessage, JSONMessage, WebsocketConnection
+from agents.messaging.connections import WebsocketConnection
+from agents.messaging.defs import BaseMessage
+from agents.messaging.messages import JSONMessage
 from agents.messaging.pool import ConnectionPool
 from agents.modules.webserver import WebServerModule
 from agents.utils import RxTxSubject

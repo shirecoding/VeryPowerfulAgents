@@ -4,7 +4,7 @@ import aiohttp
 import pytest
 
 from agents import Agent
-from agents.messaging import ConnectionPool
+from agents.messaging.pool import ConnectionPool
 from agents.modules.websocket import WebSocketModule
 from agents.utils import RxTxSubject
 

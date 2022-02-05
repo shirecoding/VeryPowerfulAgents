@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from agents.messaging import JSONMessage
+from agents.messaging.messages import JSONMessage
 
 log = logging.getLogger(__name__)
 
