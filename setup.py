@@ -10,8 +10,16 @@ setup(
     author_email="shirecoding@gmail.com",
     install_requires=["pyzmq", "rx", "rxpipes", "pyrsistent", "aiohttp"],
     extras_require={
-        "test": ["pytest", "pytest-cov", "pytest-html", "pytest-metadata", "numpy"],
+        "test": [
+            "pytest",
+            "pytest-cov",
+            "pytest-html",
+            "pytest-asyncio",
+            "pytest-metadata",
+            "numpy",
+        ],
         "docs": ["mkdocs", "mkdocstrings", "mkdocs-material"],
+        "chatserver": ["jinja2"],
     },
     url="https://github.com/shirecoding/VeryPowerfulAgents.git",
     download_url=f"https://github.com/shirecoding/VeryPowerfulAgents/archive/{__version__}.tar.gz",

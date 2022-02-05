@@ -1,38 +1,31 @@
-import logging
 import os
 import queue
 import threading
 import time
 import traceback
-import uuid
 from signal import SIGINT, SIGTERM, signal
+from typing import Optional
 
 import zmq
 from pyrsistent import pmap
 from rx.subject import Subject
 
-from .mixins import (
-    AuthenticationMixin,
-    DaemonMixin,
-    NotificationsMixin,
-    RouterClientMixin,
-    WebserverMixin,
-)
-from .utils import Logger, stdout_logger
+from agents.utils import Logger, random_uuid, stdout_logger
 
-log = stdout_logger(__name__, level=logging.DEBUG)
+log = stdout_logger(__name__)
 
 
 class Agent(
-    RouterClientMixin,
-    NotificationsMixin,
-    AuthenticationMixin,
-    WebserverMixin,
-    DaemonMixin,
+    # RouterClientMixin,
+    # NotificationsMixin,
+    # AuthenticationMixin,
+    # WebserverMixin,
+    # DaemonMixin,
 ):
-    def __init__(self, *args, name=None, **kwargs):
-        self.name = name or uuid.uuid4().hex
-        self.log = Logger(log, {"agent": self.name})
+    def __init__(self, uid: Optional[str] = None):
+
+        self.uid = uid or random_uuid()
+        self.log = Logger(log, {"agent": self.uid})
         self.initialized_event = threading.Event()
         self.exit_event = threading.Event()
         self.zmq_sockets = {}
@@ -40,14 +33,14 @@ class Agent(
         self.threads = []
         self.disposables = []
 
+        self._modules = {}
+
         # signals for graceful shutdown
         signal(SIGTERM, self._shutdown)
         signal(SIGINT, self._shutdown)
 
         # boot in thread
-        t = threading.Thread(target=self.boot, args=args, kwargs=kwargs)
-        self.threads.append(t)
-        t.start()
+        self.run_process_in_thread(self.boot)
         self.initialized_event.wait()
 
         # call initialized hook
@@ -63,26 +56,40 @@ class Agent(
         User override
         """
 
+    def is_initialized(self):
+        return self.initialized_event.is_set()
+
+    def register_module(self, module):
+        self.log.info(f"Registering module {module.uid} ...")
+        self._modules[module.uid] = module
+        module.setup()
+        self.log.info(f"Module {module.uid} setup complete ...")
+
+    def run_process_in_thread(self, f):
+        t = threading.Thread(target=f, args=(self.exit_event,))
+        self.threads.append(t)
+        t.start()
+
     def boot(self, *args, **kwargs):
         try:
             start = time.time()
-            self.log.info("Booting up ...")
-            self.zmq_context = zmq.Context()
+            # self.log.info("Booting up ...")
+            # self.zmq_context = zmq.Context()
 
             # user setup
             self.log.info("Running user setup ...")
-            self.setup(*args, **kwargs)
+            self.setup()
 
-            # setup bases
-            for base in Agent.__bases__:
-                if hasattr(base, "setup"):
-                    self.log.info(f"Initiating {base.__name__} setup procedure")
-                    base.setup(self, *args, **kwargs)
+            # # setup bases
+            # for base in Agent.__bases__:
+            #     if hasattr(base, "setup"):
+            #         self.log.info(f"Initiating {base.__name__} setup procedure")
+            #         base.setup(self, *args, **kwargs)
 
-            # process sockets
-            t = threading.Thread(target=self.process_sockets)
-            self.threads.append(t)
-            t.start()
+            # # process sockets
+            # t = threading.Thread(target=self.process_sockets)
+            # self.threads.append(t)
+            # t.start()
 
             self.initialized_event.set()
             self.log.info(f"Booted in {time.time() - start} seconds ...")
@@ -97,11 +104,17 @@ class Agent(
         Shutdown procedure, call super().shutdown() if overriding
         """
 
-        # run shutdown procedures of all bases
-        for base in Agent.__bases__:
-            if hasattr(base, "shutdown"):
-                self.log.info(f"Initiating {base.__name__} shutdown procedure")
-                base.shutdown(self)
+        # shutdown modules
+        for m in self._modules.values():
+            self.log.info(f"Shutting down module {m.uid} ...")
+            m.shutdown()
+            self.log.info(f"Module {m.uid} shutdown complete ...")
+
+        # # run shutdown procedures of all bases
+        # for base in Agent.__bases__:
+        #     if hasattr(base, "shutdown"):
+        #         self.log.info(f"Initiating {base.__name__} shutdown procedure")
+        #         base.shutdown(self)
 
         # dispose observables
         for d in self.disposables:
@@ -115,17 +128,17 @@ class Agent(
         self.initialized_event.wait()
 
         # join threads
-        self.log.debug(f"joining {len(self.threads)} threads ...")
+        self.log.info(f"joining {len(self.threads)} threads ...")
         for t in self.threads:
             self.log.info(f"joining {t}")
             t.join()
         self.log.info("joining threads complete ...")
 
-        # destroy zmq sockets
-        for k, v in self.zmq_sockets.items():
-            self.log.info(f"closing socket {k} ...")
-            v["socket"].close()
-        self.zmq_context.term()
+        # # destroy zmq sockets
+        # for k, v in self.zmq_sockets.items():
+        #     self.log.info(f"closing socket {k} ...")
+        #     v["socket"].close()
+        # self.zmq_context.term()
 
         self.log.info("shutdown complete ...")
 

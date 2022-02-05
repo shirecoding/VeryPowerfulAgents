@@ -1,3 +1,12 @@
+__all__ = [
+    "RxTxSubject",
+    "delete_directory",
+    "random_uuid",
+    "stdout_logger",
+    "Logger",
+    "Singleton",
+]
+
 import logging
 import os
 import shutil
@@ -43,7 +52,7 @@ def delete_directory(directory):
 _uuid_cycle = cycle(map(lambda x: str(x), range(100)))
 
 
-def random_uuid(self):
+def random_uuid():
     """Generate a unique string
 
     Usage:
@@ -94,7 +103,7 @@ class Logger(logging.LoggerAdapter):
 
 
 class _Singleton(type):
-    """ A metaclass that creates a Singleton base class when called. """
+    """A metaclass that creates a Singleton base class when called."""
 
     _instances = {}
 

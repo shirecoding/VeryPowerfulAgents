@@ -1,9 +1,10 @@
-from aiohttp import web
-
 from agents import Agent
+from agents.messaging.pool import ConnectionPool
+from agents.modules.websocket import WebSocketModule
+from agents.utils import RxTxSubject
 
 
-class WebServer(Agent):
+class WebSocketServer(Agent):
 
     html = """
     <!DOCTYPE html>
@@ -39,22 +40,23 @@ class WebServer(Agent):
     </html>
     """
 
-    def setup(self, host, port, route):
-
-        self.host = host
-        self.port = port
-        self.route = route
-        self.create_webserver(host, port)
-        self.create_route("GET", "/", self.echo)
-        self.rtx, self.connections = self.create_websocket(route)
-        self.disposables.append(self.rtx.subscribe(lambda msg: self.rtx.on_next(msg)))
-
-    async def echo(self, request):
-        return web.Response(
-            text=self.html.format(self.host, self.port, self.route),
-            content_type="text/html",
+    def setup(self):
+        self.connection_pool = ConnectionPool()
+        self.rtx = RxTxSubject()
+        self.register_module(
+            WebSocketModule(
+                agent=self,
+                pool=self.connection_pool,
+                rtx=self.rtx,
+            )
         )
+        self.rtx.subscribe(self.handle_message)
+
+    def handle_message(self, msg):
+        self.log.debug(msg)
+        for uid in self.connection_pool.connections:
+            self.rtx.on_next((uid, msg))
 
 
 if __name__ == "__main__":
-    webserver = WebServer("127.0.0.1", 8080, "/ws")
+    webserver = WebSocketServer()
