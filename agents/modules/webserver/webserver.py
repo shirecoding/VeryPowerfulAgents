@@ -42,31 +42,33 @@ class WebServerModule(AgentModule):
         self.app.add_routes([getattr(web, m.lower())(r, h) for m, r, h in self.routes])
 
     def setup(self):
-        def _run(exit_event):
+        def _process(exit_event):
 
             self.log.info(f"Starting web server on {self.host}:{self.port} ...")
 
             # Set event_loop as a current event loop for this current thread
             asyncio.set_event_loop(self.event_loop)
 
-            _runner = web.AppRunner(self.app)
+            async def run(exit_event):
+                # start web
+                _runner = web.AppRunner(self.app)
+                await _runner.setup()
+                await web.TCPSite(_runner, self.host, self.port).start()
 
-            async def _until_exit(exit_event):
+                # wait till exit
                 while not exit_event.is_set():
                     await asyncio.sleep(1)
+
+                # cleanup
                 await _runner.cleanup()
 
             try:
-                self.event_loop.run_until_complete(_runner.setup())
-                self.event_loop.run_until_complete(
-                    web.TCPSite(_runner, self.host, self.port).start()
-                )
-                self.event_loop.run_until_complete(_until_exit(exit_event))
+                self.event_loop.run_until_complete(run(exit_event))
             finally:
                 self.event_loop.close()
 
         # run socket server
-        self.agent.run_process_in_thread(_run)
+        self.agent.run_process_in_thread(_process)
 
     def shutdown(self):
         pass

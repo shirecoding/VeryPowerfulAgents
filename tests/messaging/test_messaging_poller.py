@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
     expected="""
     """,
 )
-def test_pool():
+def test_poller():
 
     pool = ConnectionPool()
 
@@ -42,28 +42,3 @@ def test_pool():
     assert set(pool.connections.keys()) == {"ic2"}
 
     assert pool.connections.get("ic2") == ic2
-
-
-@pytest.mark.report(
-    specification="""
-    """,
-    procedure="""
-    """,
-    expected="""
-    """,
-)
-def test_pool_messaging():
-
-    pool = ConnectionPool()
-
-    d = {"hello": "world", "nest": {"nest": "nest"}}
-
-    ic1 = InternalConnection(uid="ic1", serializer=JSONMessage)
-    ic2 = InternalConnection(uid="ic2", serializer=JSONMessage)
-
-    pool.add(ic1)
-    pool.add(ic2)
-
-    pool.send_message(ic1, d)
-
-    assert ic1.receive_message(deserialize=True) == d

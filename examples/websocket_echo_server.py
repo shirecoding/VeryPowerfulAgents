@@ -1,7 +1,7 @@
+from aiohttp.web import Response
+
 from agents import Agent
-from agents.messaging.pool import ConnectionPool
 from agents.modules.websocket import WebSocketModule
-from agents.utils import RxTxSubject
 
 
 class WebSocketServer(Agent):
@@ -41,21 +41,24 @@ class WebSocketServer(Agent):
     """
 
     def setup(self):
-        self.connection_pool = ConnectionPool()
-        self.rtx = RxTxSubject()
-        self.register_module(
-            WebSocketModule(
-                agent=self,
-                pool=self.connection_pool,
-                rtx=self.rtx,
-            )
-        )
+        # register websocket module
+        self.ws = WebSocketModule(agent=self, routes=[("GET", "/", self.get_root)])
+        self.register_module(self.ws)
+
+        # get connections and rtx
+        self.connections = self.ws.pool.connections
+        self.rtx = self.ws.pool.rtx
+
+        # subscribe to echo handler
         self.rtx.subscribe(self.handle_message)
 
-    def handle_message(self, msg):
-        self.log.debug(msg)
-        for uid in self.connection_pool.connections:
-            self.rtx.on_next((uid, msg))
+    async def get_root(self, request):
+        return Response(text="greetings!")
+
+    def handle_message(self, uid, msg):
+        self.log.debug(f"{uid}: {msg}")
+        for _uid in self.connections:
+            self.rtx.on_next((_uid, msg))
 
 
 if __name__ == "__main__":

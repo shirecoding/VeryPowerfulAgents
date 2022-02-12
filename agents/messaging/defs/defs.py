@@ -1,11 +1,8 @@
 __all__ = ["BaseMessage", "BaseConnection"]
 
-import logging
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any, Generic, Optional, TypeVar, Union
-
-logger = logging.getLogger(__name__)
 
 Deserialized_T = TypeVar("Deserialized_T")
 
@@ -27,6 +24,9 @@ class BaseMessage(Generic[Deserialized_T]):
     @classmethod
     def from_serialized(cls, serialized: str, **kwargs: Any) -> "BaseMessage":
         return cls(data=cls.deserialize(serialized), **kwargs)
+
+
+MessageOrDeserialized = Union[BaseMessage, Deserialized_T]
 
 
 @dataclass
@@ -71,35 +71,41 @@ class BaseConnection:
 
     @abstractmethod
     def close(self, *args: Any, **kwargs: Any) -> None:
-        """Close the connection"""
         raise NotImplementedError("BaseConnection/close")
 
     @abstractmethod
     def close_async(self, *args: Any, **kwargs: Any) -> None:
-        """Close the connection (async implementation)"""
         raise NotImplementedError("BaseConnection/close_async")
 
     def receive_message(
         self, deserialize: bool = False
-    ) -> Union[BaseMessage, Deserialized_T]:
-        if deserialize:
-            return self.serializer.deserialize(self.receive())
-        else:
-            return self.serializer.from_serialized(self.receive())
+    ) -> Optional[MessageOrDeserialized]:
+        data = self.receive()
+        if data:
+            return (
+                self.serializer.deserialize(data)
+                if deserialize
+                else self.serializer.from_serialized(data)
+            )
+        return None
 
     async def receive_message_async(
         self, deserialize: bool = False
-    ) -> Union[BaseMessage, Deserialized_T]:
-        if deserialize:
-            return self.serializer.deserialize(await self.receive_async())
-        else:
-            return self.serializer.from_serialized(await self.receive_async())
+    ) -> Optional[MessageOrDeserialized]:
+        data = await self.receive_async()
+        if data:
+            return (
+                self.serializer.deserialize(data)
+                if deserialize
+                else self.serializer.from_serialized(data)
+            )
+        return None
 
-    def send_message(self, message: Union[BaseMessage, Deserialized_T]) -> None:
+    def send_message(self, message: MessageOrDeserialized) -> None:
         """Sends a message to the client in this connection
 
         Args:
-            message: Union[BaseMessage, Deserialized_T]
+            message: MessageOrDeserialized
         Returns:
             None
         """
@@ -108,13 +114,11 @@ class BaseConnection:
         else:
             self.send(self.serializer(data=message).serialize())
 
-    async def send_message_async(
-        self, message: Union[BaseMessage, Deserialized_T]
-    ) -> None:
+    async def send_message_async(self, message: MessageOrDeserialized) -> None:
         """Sends a message to the client in this connection (self.send is async)
 
         Args:
-            message: Union[BaseMessage, Deserialized_T]
+            message: MessageOrDeserialized
         Returns:
             None
         """
